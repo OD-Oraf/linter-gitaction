@@ -1,8 +1,10 @@
 [
   {
-    "category1" : "value1"
+    "tagKey" : "Owning Business Group",
+    "value": "Global Platform Service"
   },
   {
-    "category2" : "value2"
+    "tagKey" : "Data Classification",
+    "value" : "DCL1"
   }
 ]
