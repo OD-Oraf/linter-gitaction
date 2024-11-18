@@ -18,7 +18,7 @@ pipeline {
                 // Checkout code from version control
                 git branch: 'main', url: 'https://github.com/OD-Oraf/mygitactions.git'
                 sh "echo 'hello world' > example.txt"
-                echo "checking out code"
+
                 greet name: 'od',
                  apiSpecFilePath: "api-spec/openapi---1.0.3.yaml",
                  categoriesFilePath: "categories.json",
