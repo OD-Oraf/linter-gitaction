@@ -22,7 +22,9 @@ pipeline {
                 greet filePath: "categories.json",
                  name: 'od',
                  orgId: "a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
-                 assetId: "deom"
+                 assetId: "deom",
+                 clientId: "9d86c5d7bcb6405bab5f66db454fb7d2",
+                 clientSecret: "0620101761de45ff87837B4D7068bd56",
             }
         }
 
