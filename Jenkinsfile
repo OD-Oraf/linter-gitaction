@@ -20,7 +20,7 @@ pipeline {
                 sh "echo 'hello world' > example.txt"
 
                 greet name: 'od',
-                 apiSpecFilePath: "api-spec/openapi---1.0.3.yaml",
+                 apiSpecFilePath: "api-spec/openapi---1.0.4.yaml",
                  categoriesFilePath: "categories.json",
                  orgId: "a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
                  assetId: "deom",
