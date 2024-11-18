@@ -21,7 +21,7 @@ pipeline {
                 echo "checking out code"
                 greet filePath: "categories.json",
                  name: 'od',
-                 orgId:"a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
+                 orgId: "a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
                  assetId: "deom"
             }
         }
