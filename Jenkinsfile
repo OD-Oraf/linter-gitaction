@@ -17,12 +17,12 @@ pipeline {
                 // sh "printenv"
                 // Checkout code from version control
                 git branch: 'main', url: 'https://github.com/OD-Oraf/mygitactions.git'
-                sh "echo 'hello world' > example.txt"
+//                 sh "echo 'hello world' > example.txt"
 
-                upload apiSpecFilePath: "api-spec/openapi---1.0.5.yaml",
+                upload apiSpecFilePath: "api-spec/openapi---1.0.6.yaml",
                  categoriesFilePath: "categories.json",
                  orgId: "a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
-                 assetId: "deom",
+                 assetId: "demo",
                  clientId: "9d86c5d7bcb6405bab5f66db454fb7d2",
                  clientSecret: "0620101761de45ff87837B4D7068bd56"
             }
