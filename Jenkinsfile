@@ -23,7 +23,7 @@ pipeline {
                  categoriesFilePath: "categories.json",
                  orgId: "a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
                  assetId: "od-demo",
-                 clientId: "9d86c5d7bcb6405bab5f66db454fb7d",
+                 clientId: "9d86c5d7bcb6405bab5f66db454fb7d2",
                  clientSecret: "0620101761de45ff87837B4D7068bd56"
             }
         }
