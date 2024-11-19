@@ -19,7 +19,7 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/OD-Oraf/mygitactions.git'
 //                 sh "echo 'hello world' > example.txt"
 
-                upload apiSpecFilePath: "api-spec/openapi---1.0.6.yaml",
+                upload apiSpecFilePath: "api-spec/openapi---1.0.7.yaml",
                  categoriesFilePath: "categories.json",
                  orgId: "a541ecba-4afe-4ce2-a4bb-7c8849912c7f",
                  assetId: "demo",
