@@ -1,5 +1,5 @@
-name: 'Markdown Linter'
-description: 'Lint markdown files using markdownlint-cli'
+name: 'Documentation and API Validation Action'
+description: 'Lint markdown files using markdownlint-cli and validate OpenAPI specifications using Spectral'
 author: 'OD-Oraf'
 
 inputs:
@@ -27,16 +27,33 @@ runs:
         npm install -g @stoplight/spectral-cli
         echo "✅ Installed markdownlint-cli and spectral-cli"
       
+    - name: Initialize validation state
+      shell: bash
+      run: |
+        echo "VALIDATION_FAILED=false" >> $GITHUB_ENV
+        echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
+        echo "OPENAPI_ERRORS=0" >> $GITHUB_ENV
+        echo "# Validation Error Log" > validation-errors.md
+        echo "" >> validation-errors.md
+        
     - name: Validate inputs
       shell: bash
       run: |
         if [ ! -d "${{ inputs.documentation-directory }}" ]; then
           echo "Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
+          echo "## ❌ Input Validation Errors" >> validation-errors.md
+          echo "- Documentation directory '${{ inputs.documentation-directory }}' does not exist" >> validation-errors.md
+          echo "" >> validation-errors.md
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           exit 1
         fi
         
         if [ ! -f "${{ inputs.openapi-file }}" ]; then
           echo "Error: OpenAPI file '${{ inputs.openapi-file }}' does not exist"
+          echo "## ❌ Input Validation Errors" >> validation-errors.md
+          echo "- OpenAPI file '${{ inputs.openapi-file }}' does not exist" >> validation-errors.md
+          echo "" >> validation-errors.md
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           exit 1
         fi
         
@@ -102,14 +119,27 @@ runs:
           exit 0
         fi
         
-        # Run markdownlint
-        markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json
-        
-        if [ $? -eq 0 ]; then
-          echo "✅ All markdown files passed linting!"
+        # Run markdownlint and capture output
+        if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json > markdownlint-output.txt 2>&1; then
+          echo "❌ Markdown linting failed"
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+          
+          # Count errors
+          error_count=$(wc -l < markdownlint-output.txt || echo "0")
+          echo "MARKDOWN_ERRORS=$error_count" >> $GITHUB_ENV
+          
+          # Add errors to validation log
+          echo "## ❌ Markdown Linting Errors ($error_count issues)" >> validation-errors.md
+          echo "" >> validation-errors.md
+          echo '```' >> validation-errors.md
+          cat markdownlint-output.txt >> validation-errors.md
+          echo '```' >> validation-errors.md
+          echo "" >> validation-errors.md
+          
+          # Display errors in console
+          cat markdownlint-output.txt
         else
-          echo "❌ Markdown linting failed. Please fix the issues above."
-          exit 1
+          echo "✅ All markdown files passed linting!"
         fi
         
     - name: Validate OpenAPI file format
@@ -131,6 +161,10 @@ runs:
           echo "✅ OpenAPI file is not empty"
         else
           echo "❌ OpenAPI file is empty"
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+          echo "## ❌ OpenAPI File Validation Errors" >> validation-errors.md
+          echo "- OpenAPI file is empty" >> validation-errors.md
+          echo "" >> validation-errors.md
           exit 1
         fi
         
@@ -139,15 +173,15 @@ runs:
       run: |
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
-        # Run Spectral linting
-        spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format stylish
-        spectral_exit_code=$?
-        
-        if [ $spectral_exit_code -eq 0 ]; then
-          echo "✅ OpenAPI specification passed Spectral validation!"
+        # Run Spectral linting and capture output
+        if ! spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format stylish > spectral-output.txt 2>&1; then
+          echo "❌ OpenAPI specification failed Spectral validation"
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+          
+          # Display errors in console
+          cat spectral-output.txt
         else
-          echo "❌ OpenAPI specification failed Spectral validation. Please fix the issues above."
-          exit 1
+          echo "✅ OpenAPI specification passed Spectral validation!"
         fi
         
     - name: Generate OpenAPI validation report
@@ -156,7 +190,7 @@ runs:
         echo "📊 Generating detailed OpenAPI validation report..."
         
         # Generate JSON report for potential artifact upload
-        spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format json > spectral-report.json
+        spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
         
         # Generate human-readable report
         echo "## OpenAPI Validation Report" > spectral-report.md
@@ -166,7 +200,7 @@ runs:
         echo "" >> spectral-report.md
         
         # Check if there are any issues
-        issue_count=$(jq length spectral-report.json)
+        issue_count=$(jq length spectral-report.json 2>/dev/null || echo "0")
         
         if [ "$issue_count" -eq 0 ]; then
           echo "**Status:** ✅ No issues found" >> spectral-report.md
@@ -177,7 +211,7 @@ runs:
           echo "" >> spectral-report.md
           
           # Convert JSON report to markdown table
-          jq -r '.[] | "| \(.severity) | \(.code) | \(.path | join(".")) | \(.message) |"' spectral-report.json > temp-issues.txt
+          jq -r '.[] | "| \(.severity) | \(.code) | \(.path | join(".")) | \(.message) |"' spectral-report.json > temp-issues.txt 2>/dev/null || touch temp-issues.txt
           
           if [ -s temp-issues.txt ]; then
             echo "| Severity | Rule | Path | Message |" >> spectral-report.md
@@ -196,13 +230,13 @@ runs:
         echo "🔍 Performing additional OpenAPI structure validation..."
         
         # Check for required OpenAPI fields using spectral
-        spectral lint "${{ inputs.openapi-file }}" --ruleset "@stoplight/spectral/rulesets/oas" --format json > structure-check.json
+        spectral lint "${{ inputs.openapi-file }}" --ruleset "@stoplight/spectral/rulesets/oas" --format json > structure-check.json 2>/dev/null || echo "[]" > structure-check.json
         
         # Count errors vs warnings
-        error_count=$(jq '[.[] | select(.severity == 0)] | length' structure-check.json)
-        warning_count=$(jq '[.[] | select(.severity == 1)] | length' structure-check.json)
-        info_count=$(jq '[.[] | select(.severity == 2)] | length' structure-check.json)
-        hint_count=$(jq '[.[] | select(.severity == 3)] | length' structure-check.json)
+        error_count=$(jq '[.[] | select(.severity == 0)] | length' structure-check.json 2>/dev/null || echo "0")
+        warning_count=$(jq '[.[] | select(.severity == 1)] | length' structure-check.json 2>/dev/null || echo "0")
+        info_count=$(jq '[.[] | select(.severity == 2)] | length' structure-check.json 2>/dev/null || echo "0")
+        hint_count=$(jq '[.[] | select(.severity == 3)] | length' structure-check.json 2>/dev/null || echo "0")
         
         echo "📊 OpenAPI Structure Analysis:"
         echo "  - Errors: $error_count"
@@ -210,11 +244,18 @@ runs:
         echo "  - Info: $info_count"
         echo "  - Hints: $hint_count"
         
+        # Store error count for final validation
+        echo "OPENAPI_ERRORS=$error_count" >> $GITHUB_ENV
+        
         if [ "$error_count" -gt 0 ]; then
           echo "❌ OpenAPI specification has structural errors that must be fixed"
-          echo "🔍 Error details:"
-          jq -r '.[] | select(.severity == 0) | "  - \(.code): \(.message) (Path: \(.path | join(".")))"' structure-check.json
-          exit 1
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+          
+          # Add OpenAPI errors to validation log
+          echo "## ❌ OpenAPI Structural Errors ($error_count errors)" >> validation-errors.md
+          echo "" >> validation-errors.md
+          jq -r '.[] | select(.severity == 0) | "- **\(.code)**: \(.message) (Path: \(.path | join(".")))"' structure-check.json >> validation-errors.md 2>/dev/null || echo "- Error parsing OpenAPI issues" >> validation-errors.md
+          echo "" >> validation-errors.md
         else
           echo "✅ OpenAPI specification structure is valid"
         fi
@@ -229,6 +270,14 @@ runs:
         echo "**Validation completed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
+        # Overall status
+        if [ "$VALIDATION_FAILED" = "true" ]; then
+          echo "## ❌ Validation Status: FAILED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ✅ Validation Status: PASSED" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
         # Markdown Linting Summary
         echo "## 📝 Markdown Linting Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -239,6 +288,8 @@ runs:
         
         if [ $md_count -eq 0 ]; then
           echo "- **Status:** ⚠️ No markdown files found" >> $GITHUB_STEP_SUMMARY
+        elif [ "$MARKDOWN_ERRORS" -gt 0 ]; then
+          echo "- **Status:** ❌ Found $MARKDOWN_ERRORS linting issues" >> $GITHUB_STEP_SUMMARY
         else
           echo "- **Status:** ✅ All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
         fi
@@ -290,6 +341,14 @@ runs:
           echo "" >> $GITHUB_STEP_SUMMARY
         fi
         
+        # Add error details if validation failed
+        if [ "$VALIDATION_FAILED" = "true" ] && [ -f validation-errors.md ]; then
+          echo "## 🚨 Error Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat validation-errors.md >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
         # Add artifacts information
         echo "## 📄 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -299,42 +358,61 @@ runs:
         echo "- \`spectral-report.md\` - Human-readable OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
         echo "- \`.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
         echo "- \`.spectral.yml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
+        if [ -f validation-errors.md ]; then
+          echo "- \`validation-errors.md\` - Detailed error log" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "" >> $GITHUB_STEP_SUMMARY
         
         # Add next steps if there are issues
-        if [ -f spectral-report.json ]; then
-          total_issues=$(jq length spectral-report.json 2>/dev/null || echo "0")
-          if [ "$total_issues" -gt 0 ]; then
-            echo "## 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "To resolve the identified issues:" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "1. Review the detailed issue list above" >> $GITHUB_STEP_SUMMARY
-            echo "2. Download the \`spectral-report.json\` artifact for machine-readable results" >> $GITHUB_STEP_SUMMARY
-            echo "3. Fix the issues in your OpenAPI specification" >> $GITHUB_STEP_SUMMARY
-            echo "4. Re-run the validation to verify fixes" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
+        if [ "$VALIDATION_FAILED" = "true" ]; then
+          echo "## 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To resolve the identified issues:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the error details above" >> $GITHUB_STEP_SUMMARY
+          echo "2. Download the \`validation-errors.md\` artifact for complete error log" >> $GITHUB_STEP_SUMMARY
+          echo "3. Fix the issues in your documentation and/or OpenAPI specification" >> $GITHUB_STEP_SUMMARY
+          echo "4. Re-run the validation to verify fixes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "---" >> $GITHUB_STEP_SUMMARY
         echo "*Report generated by Documentation and API Validation Action*" >> $GITHUB_STEP_SUMMARY
         
-    - name: Summary
+    - name: Final validation check
       shell: bash
       run: |
-        echo "🎉 Linting and validation completed successfully!"
-        echo "📊 Summary:"
+        echo "🔍 Performing final validation check..."
+        echo ""
+        echo "📊 Final Summary:"
         echo "  - Documentation directory: ${{ inputs.documentation-directory }}"
         echo "  - OpenAPI file: ${{ inputs.openapi-file }}"
         echo "  - Markdown files linted: $(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)"
-        echo "  - OpenAPI validation: ✅ Passed"
+        echo "  - Markdown errors: $MARKDOWN_ERRORS"
+        echo "  - OpenAPI errors: $OPENAPI_ERRORS"
         echo ""
-        echo "📄 Generated reports:"
-        echo "  - spectral-report.json (machine-readable)"
-        echo "  - spectral-report.md (human-readable)"
-        echo ""
-        echo "📋 GitHub Step Summary has been updated with detailed results"
+        
+        if [ "$VALIDATION_FAILED" = "true" ]; then
+          echo "❌ Validation FAILED - Build will fail"
+          echo ""
+          echo "📄 Generated reports:"
+          echo "  - spectral-report.json (machine-readable)"
+          echo "  - spectral-report.md (human-readable)"
+          echo "  - validation-errors.md (error log)"
+          echo ""
+          echo "📋 GitHub Step Summary has been updated with detailed results and error information"
+          echo ""
+          echo "Please review the errors above and in the step summary, then fix the issues before re-running."
+          exit 1
+        else
+          echo "✅ All validation checks passed!"
+          echo ""
+          echo "📄 Generated reports:"
+          echo "  - spectral-report.json (machine-readable)"
+          echo "  - spectral-report.md (human-readable)"
+          echo ""
+          echo "📋 GitHub Step Summary has been updated with detailed results"
+        fi
 
 branding:
   icon: 'check-circle'
