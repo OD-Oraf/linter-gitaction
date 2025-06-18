@@ -1,0 +1,341 @@
+name: 'Markdown Linter'
+description: 'Lint markdown files using markdownlint-cli'
+author: 'OD-Oraf'
+
+inputs:
+  documentation-directory:
+    description: 'Directory containing markdown files to lint'
+    required: true
+    default: './documentation'
+  openapi-file:
+    description: 'Path to OpenAPI specification file'
+    required: true
+    default: './openapi.yaml'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install CLI tools
+      shell: bash
+      run: |
+        npm install -g markdownlint-cli
+        npm install -g @stoplight/spectral-cli
+        echo "✅ Installed markdownlint-cli and spectral-cli"
+      
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ ! -d "${{ inputs.documentation-directory }}" ]; then
+          echo "Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
+          exit 1
+        fi
+        
+        if [ ! -f "${{ inputs.openapi-file }}" ]; then
+          echo "Error: OpenAPI file '${{ inputs.openapi-file }}' does not exist"
+          exit 1
+        fi
+        
+        echo "✅ Input validation passed"
+        echo "📁 Documentation directory: ${{ inputs.documentation-directory }}"
+        echo "📄 OpenAPI file: ${{ inputs.openapi-file }}"
+        
+    - name: Create markdownlint config
+      shell: bash
+      run: |
+        cat > .markdownlint.json << 'EOF'
+        {
+          "default": true,
+          "MD013": {
+            "line_length": 120,
+            "code_blocks": false,
+            "tables": false
+          },
+          "MD033": {
+            "allowed_elements": ["br", "sub", "sup"]
+          },
+          "MD041": false
+        }
+        EOF
+        echo "📝 Created markdownlint configuration"
+        
+    - name: Create Spectral config
+      shell: bash
+      run: |
+        cat > .spectral.yml << 'EOF'
+        extends: ["@stoplight/spectral/rulesets/oas"]
+        rules:
+          info-contact: error
+          info-description: error
+          info-license: warn
+          operation-description: error
+          operation-operationId-unique: error
+          operation-operationId-valid-in-url: error
+          operation-parameters: error
+          operation-tag-defined: error
+          path-keys-no-trailing-slash: error
+          tag-description: warn
+          oas3-api-servers: error
+          oas3-examples-value-or-externalValue: error
+          oas3-operation-security-defined: error
+          oas3-parameter-description: warn
+          oas3-schema-names-pascal-case: warn
+          oas3-server-trailing-slash: error
+        EOF
+        echo "📝 Created Spectral configuration for OpenAPI validation"
+        
+    - name: Lint markdown files
+      shell: bash
+      run: |
+        echo "🔍 Linting markdown files in ${{ inputs.documentation-directory }}"
+        
+        # Count markdown files
+        md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
+        echo "Found $md_count markdown file(s) to lint"
+        
+        if [ $md_count -eq 0 ]; then
+          echo "⚠️  No markdown files found in ${{ inputs.documentation-directory }}"
+          exit 0
+        fi
+        
+        # Run markdownlint
+        markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ All markdown files passed linting!"
+        else
+          echo "❌ Markdown linting failed. Please fix the issues above."
+          exit 1
+        fi
+        
+    - name: Validate OpenAPI file format
+      shell: bash
+      run: |
+        echo "🔍 Validating OpenAPI file format: ${{ inputs.openapi-file }}"
+        
+        # Check if file has .yaml or .yml extension
+        if [[ "${{ inputs.openapi-file }}" =~ \.(yaml|yml)$ ]]; then
+          echo "✅ OpenAPI file has valid YAML extension"
+        elif [[ "${{ inputs.openapi-file }}" =~ \.json$ ]]; then
+          echo "✅ OpenAPI file has valid JSON extension"
+        else
+          echo "⚠️  OpenAPI file extension is not .yaml, .yml, or .json"
+        fi
+        
+        # Basic file validation
+        if [ -s "${{ inputs.openapi-file }}" ]; then
+          echo "✅ OpenAPI file is not empty"
+        else
+          echo "❌ OpenAPI file is empty"
+          exit 1
+        fi
+        
+    - name: Lint OpenAPI specification with Spectral
+      shell: bash
+      run: |
+        echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
+        
+        # Run Spectral linting
+        spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format stylish
+        spectral_exit_code=$?
+        
+        if [ $spectral_exit_code -eq 0 ]; then
+          echo "✅ OpenAPI specification passed Spectral validation!"
+        else
+          echo "❌ OpenAPI specification failed Spectral validation. Please fix the issues above."
+          exit 1
+        fi
+        
+    - name: Generate OpenAPI validation report
+      shell: bash
+      run: |
+        echo "📊 Generating detailed OpenAPI validation report..."
+        
+        # Generate JSON report for potential artifact upload
+        spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format json > spectral-report.json
+        
+        # Generate human-readable report
+        echo "## OpenAPI Validation Report" > spectral-report.md
+        echo "" >> spectral-report.md
+        echo "**File:** \`${{ inputs.openapi-file }}\`" >> spectral-report.md
+        echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> spectral-report.md
+        echo "" >> spectral-report.md
+        
+        # Check if there are any issues
+        issue_count=$(jq length spectral-report.json)
+        
+        if [ "$issue_count" -eq 0 ]; then
+          echo "**Status:** ✅ No issues found" >> spectral-report.md
+        else
+          echo "**Status:** ⚠️  Found $issue_count issue(s)" >> spectral-report.md
+          echo "" >> spectral-report.md
+          echo "### Issues Found:" >> spectral-report.md
+          echo "" >> spectral-report.md
+          
+          # Convert JSON report to markdown table
+          jq -r '.[] | "| \(.severity) | \(.code) | \(.path | join(".")) | \(.message) |"' spectral-report.json > temp-issues.txt
+          
+          if [ -s temp-issues.txt ]; then
+            echo "| Severity | Rule | Path | Message |" >> spectral-report.md
+            echo "|----------|------|------|---------|" >> spectral-report.md
+            cat temp-issues.txt >> spectral-report.md
+          fi
+          
+          rm -f temp-issues.txt
+        fi
+        
+        echo "📄 OpenAPI validation report generated: spectral-report.md"
+        
+    - name: Validate OpenAPI specification structure
+      shell: bash
+      run: |
+        echo "🔍 Performing additional OpenAPI structure validation..."
+        
+        # Check for required OpenAPI fields using spectral
+        spectral lint "${{ inputs.openapi-file }}" --ruleset "@stoplight/spectral/rulesets/oas" --format json > structure-check.json
+        
+        # Count errors vs warnings
+        error_count=$(jq '[.[] | select(.severity == 0)] | length' structure-check.json)
+        warning_count=$(jq '[.[] | select(.severity == 1)] | length' structure-check.json)
+        info_count=$(jq '[.[] | select(.severity == 2)] | length' structure-check.json)
+        hint_count=$(jq '[.[] | select(.severity == 3)] | length' structure-check.json)
+        
+        echo "📊 OpenAPI Structure Analysis:"
+        echo "  - Errors: $error_count"
+        echo "  - Warnings: $warning_count"
+        echo "  - Info: $info_count"
+        echo "  - Hints: $hint_count"
+        
+        if [ "$error_count" -gt 0 ]; then
+          echo "❌ OpenAPI specification has structural errors that must be fixed"
+          echo "🔍 Error details:"
+          jq -r '.[] | select(.severity == 0) | "  - \(.code): \(.message) (Path: \(.path | join(".")))"' structure-check.json
+          exit 1
+        else
+          echo "✅ OpenAPI specification structure is valid"
+        fi
+        
+        rm -f structure-check.json
+        
+    - name: Generate GitHub Step Summary
+      shell: bash
+      run: |
+        echo "# 📋 Documentation and API Validation Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Validation completed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Markdown Linting Summary
+        echo "## 📝 Markdown Linting Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
+        echo "- **Directory:** \`${{ inputs.documentation-directory }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Files processed:** $md_count markdown files" >> $GITHUB_STEP_SUMMARY
+        
+        if [ $md_count -eq 0 ]; then
+          echo "- **Status:** ⚠️ No markdown files found" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status:** ✅ All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # OpenAPI Validation Summary
+        echo "## 🔍 OpenAPI Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **File:** \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
+        
+        # Add Spectral report content if it exists
+        if [ -f spectral-report.md ]; then
+          # Extract status from the spectral report
+          if grep -q "No issues found" spectral-report.md; then
+            echo "- **Status:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
+          else
+            issue_count=$(jq length spectral-report.json 2>/dev/null || echo "0")
+            echo "- **Status:** ⚠️ Found $issue_count issue(s)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Add detailed Spectral results
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Detailed OpenAPI Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add the spectral report content (skip the header since we have our own)
+          tail -n +4 spectral-report.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status:** ✅ Validation passed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add issue breakdown if spectral report exists
+        if [ -f spectral-report.json ]; then
+          error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
+          warning_count=$(jq '[.[] | select(.severity == 1)] | length' spectral-report.json 2>/dev/null || echo "0")
+          info_count=$(jq '[.[] | select(.severity == 2)] | length' spectral-report.json 2>/dev/null || echo "0")
+          hint_count=$(jq '[.[] | select(.severity == 3)] | length' spectral-report.json 2>/dev/null || echo "0")
+          
+          echo "### 📊 Issue Breakdown" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Errors | $error_count |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Warnings | $warning_count |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔵 Info | $info_count |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💡 Hints | $hint_count |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Add artifacts information
+        echo "## 📄 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "The following validation reports have been generated:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- \`spectral-report.json\` - Machine-readable OpenAPI validation results" >> $GITHUB_STEP_SUMMARY
+        echo "- \`spectral-report.md\` - Human-readable OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
+        echo "- \`.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
+        echo "- \`.spectral.yml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add next steps if there are issues
+        if [ -f spectral-report.json ]; then
+          total_issues=$(jq length spectral-report.json 2>/dev/null || echo "0")
+          if [ "$total_issues" -gt 0 ]; then
+            echo "## 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To resolve the identified issues:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. Review the detailed issue list above" >> $GITHUB_STEP_SUMMARY
+            echo "2. Download the \`spectral-report.json\` artifact for machine-readable results" >> $GITHUB_STEP_SUMMARY
+            echo "3. Fix the issues in your OpenAPI specification" >> $GITHUB_STEP_SUMMARY
+            echo "4. Re-run the validation to verify fixes" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+        
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Report generated by Documentation and API Validation Action*" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Summary
+      shell: bash
+      run: |
+        echo "🎉 Linting and validation completed successfully!"
+        echo "📊 Summary:"
+        echo "  - Documentation directory: ${{ inputs.documentation-directory }}"
+        echo "  - OpenAPI file: ${{ inputs.openapi-file }}"
+        echo "  - Markdown files linted: $(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)"
+        echo "  - OpenAPI validation: ✅ Passed"
+        echo ""
+        echo "📄 Generated reports:"
+        echo "  - spectral-report.json (machine-readable)"
+        echo "  - spectral-report.md (human-readable)"
+        echo ""
+        echo "📋 GitHub Step Summary has been updated with detailed results"
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
