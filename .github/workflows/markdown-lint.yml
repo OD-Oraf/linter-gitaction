@@ -1,0 +1,43 @@
+name: Documentation and API Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'documentation/**/*.md'
+      - 'openapi.yaml'
+      - 'actions/action.yaml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'documentation/**/*.md'
+      - 'openapi.yaml'
+      - 'actions/action.yaml'
+  workflow_dispatch:
+
+jobs:
+  validate-docs-and-api:
+    name: Validate Documentation and OpenAPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Documentation and API Validation
+        uses: ./actions
+        with:
+          documentation-directory: './documentation'
+          openapi-file: './openapi.yaml'
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: |
+            .markdownlint.json
+            .spectral.yml
+            spectral-report.json
+            spectral-report.md
+          retention-days: 30
