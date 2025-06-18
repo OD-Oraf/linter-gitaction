@@ -30,6 +30,27 @@ jobs:
           documentation-directory: './documentation'
           openapi-file: './openapi.yaml'
           
+      - name: Debug validation state
+        if: always()
+        shell: bash
+        run: |
+          echo " Debug Information:"
+          echo "VALIDATION_FAILED: $VALIDATION_FAILED"
+          echo "MARKDOWN_ERRORS: $MARKDOWN_ERRORS" 
+          echo "OPENAPI_ERRORS: $OPENAPI_ERRORS"
+          echo ""
+          echo " File structure:"
+          ls -la
+          echo ""
+          echo " Documentation directory:"
+          ls -la documentation/ || echo "Documentation directory not found"
+          echo ""
+          echo " OpenAPI file:"
+          ls -la openapi.yaml || echo "OpenAPI file not found"
+          echo ""
+          echo " Generated files:"
+          ls -la *.md *.json *.yml 2>/dev/null || echo "No generated files found"
+          
       - name: Upload validation reports
         if: always()
         uses: actions/upload-artifact@v4
