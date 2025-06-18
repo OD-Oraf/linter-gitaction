@@ -179,6 +179,7 @@ runs:
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           
           # Display errors in console
+          echo "Printing spectral output:"
           cat spectral-output.txt
         else
           echo "✅ OpenAPI specification passed Spectral validation!"
