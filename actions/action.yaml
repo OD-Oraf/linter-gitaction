@@ -45,7 +45,6 @@ runs:
           echo "- Documentation directory '${{ inputs.documentation-directory }}' does not exist" >> validation-errors.md
           echo "" >> validation-errors.md
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          exit 1
         fi
         
         if [ ! -f "${{ inputs.openapi-file }}" ]; then
@@ -54,7 +53,6 @@ runs:
           echo "- OpenAPI file '${{ inputs.openapi-file }}' does not exist" >> validation-errors.md
           echo "" >> validation-errors.md
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          exit 1
         fi
         
         echo "✅ Input validation passed"
@@ -79,31 +77,6 @@ runs:
         }
         EOF
         echo "📝 Created markdownlint configuration"
-
-#    - name: Create Spectral config
-#      shell: bash
-#      run: |
-#        cat > .spectral.yml << 'EOF'
-#        extends: ["@stoplight/spectral/rulesets/oas"]
-#        rules:
-#          info-contact: error
-#          info-description: error
-#          info-license: warn
-#          operation-description: error
-#          operation-operationId-unique: error
-#          operation-operationId-valid-in-url: error
-#          operation-parameters: error
-#          operation-tag-defined: error
-#          path-keys-no-trailing-slash: error
-#          tag-description: warn
-#          oas3-api-servers: error
-#          oas3-examples-value-or-externalValue: error
-#          oas3-operation-security-defined: error
-#          oas3-parameter-description: warn
-#          oas3-schema-names-pascal-case: warn
-#          oas3-server-trailing-slash: error
-#        EOF
-#        echo "📝 Created Spectral configuration for OpenAPI validation"
 
     - name: Lint markdown files
       shell: bash
@@ -172,12 +145,12 @@ runs:
       shell: bash
       run: |
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
-        
+
         # Run Spectral linting and capture output
         if ! spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format stylish > spectral-output.txt 2>&1; then
           echo "❌ OpenAPI specification failed Spectral validation"
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          
+
           # Display errors in console
           echo "Printing spectral output:"
           cat spectral-output.txt
