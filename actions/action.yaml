@@ -11,6 +11,10 @@ inputs:
     description: 'Path to OpenAPI specification file'
     required: true
     default: './openapi.yaml'
+  categories-file:
+    description: 'Path to categories file'
+    required: true
+    default: './categories.json'
 
 runs:
   using: 'composite'
@@ -25,7 +29,8 @@ runs:
       run: |
         npm install -g markdownlint-cli
         npm install -g @stoplight/spectral-cli
-        echo "✅ Installed markdownlint-cli and spectral-cli"
+        npm install -g ajv-cli
+        echo "✅ Installed markdownlint-cli, spectral-cli, and ajv-cli"
       
     - name: Initialize validation state
       shell: bash
@@ -33,6 +38,7 @@ runs:
         echo "VALIDATION_FAILED=false" >> $GITHUB_ENV
         echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
         echo "OPENAPI_ERRORS=0" >> $GITHUB_ENV
+        echo "JSON_ERRORS=0" >> $GITHUB_ENV
         echo "# Validation Error Log" > validation-errors.md
         echo "" >> validation-errors.md
         
@@ -138,6 +144,54 @@ runs:
           cat markdownlint-output.txt
         else
           echo "✅ All markdown files passed linting!"
+        fi
+
+    - name: Validate Categories file against schema
+      shell: bash
+      run: |
+        echo "🔍 Validating categories file against schema..."
+        
+        # Initialize JSON validation state
+        json_errors=0
+        
+        # Validate categories file if it exists
+        if [ -f "${{ inputs.categories-file }}" ]; then
+          echo "📄 Validating ${{ inputs.categories-file }} against schema..."
+          
+          if [ -f "categories-schema.json" ]; then
+            if ajv validate -s categories-schema.json -d "${{ inputs.categories-file }}" --verbose; then
+              echo "✅ Categories file is valid"
+            else
+              echo "❌ Categories file validation failed"
+              echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+              json_errors=$((json_errors + 1))
+              
+              # Add to validation log
+              echo "## ❌ JSON Schema Validation Errors" >> validation-errors.md
+              echo "" >> validation-errors.md
+              echo "### Categories file validation failed:" >> validation-errors.md
+              echo "**File:** \`${{ inputs.categories-file }}\`" >> validation-errors.md
+              echo "**Schema:** \`categories-schema.json\`" >> validation-errors.md
+              echo "" >> validation-errors.md
+              echo '```' >> validation-errors.md
+              ajv validate -s categories-schema.json -d "${{ inputs.categories-file }}" --verbose 2>&1 || true >> validation-errors.md
+              echo '```' >> validation-errors.md
+              echo "" >> validation-errors.md
+            fi
+          else
+            echo "⚠️  categories-schema.json not found, skipping validation"
+          fi
+        else
+          echo "⚠️  Categories file ${{ inputs.categories-file }} not found, skipping validation"
+        fi
+        
+        # Store JSON error count
+        echo "JSON_ERRORS=$json_errors" >> $GITHUB_ENV
+        
+        if [ $json_errors -eq 0 ]; then
+          echo "✅ Categories file passed schema validation!"
+        else
+          echo "❌ Found $json_errors JSON schema validation error(s)"
         fi
 
     - name: Lint OpenAPI specification with Spectral
@@ -273,6 +327,28 @@ runs:
         
         echo "" >> $GITHUB_STEP_SUMMARY
         
+        # JSON Schema Validation Summary
+        echo "## 📋 JSON Schema Validation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "$JSON_ERRORS" -eq 0 ]; then
+          echo "- **Status:** ✅ Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status:** ❌ Found $JSON_ERRORS JSON schema validation error(s)" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # List validated files
+        if [ -f "${{ inputs.categories-file }}" ]; then
+          echo "- **Files validated:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ -f "categories-schema.json" ]; then
+            echo "- **Schema used:** \`categories-schema.json\`" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "- **Files validated:** None found (expected: \`${{ inputs.categories-file }}\`)" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
         # Add issue breakdown if spectral report exists
         if [ -f spectral-report.json ]; then
           error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
@@ -340,6 +416,7 @@ runs:
         echo "  - Markdown files linted: $(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)"
         echo "  - Markdown errors: $MARKDOWN_ERRORS"
         echo "  - OpenAPI errors: $OPENAPI_ERRORS"
+        echo "  - JSON errors: $JSON_ERRORS"
         echo ""
         
         if [ "$VALIDATION_FAILED" = "true" ]; then

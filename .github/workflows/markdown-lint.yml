@@ -29,6 +29,7 @@ jobs:
         with:
           documentation-directory: './documentation'
           openapi-file: './openapi.yaml'
+          categories-file: './categories.json'
           
       - name: Debug validation state
         if: always()
