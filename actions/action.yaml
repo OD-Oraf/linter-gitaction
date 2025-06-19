@@ -141,6 +141,7 @@ runs:
       shell: bash
       run: |
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
+        spectral lint ${{ inputs.openapi-file }}" --ruleset actions/.spectral.yaml --format stylish
         
         # Generate JSON report for potential artifact upload
         spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
@@ -158,6 +159,8 @@ runs:
         if [ "$issue_count" -eq 0 ]; then
           echo "**Status:** ✅ No issues found" >> spectral-report.md
         else
+          # Fail build on issues
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           echo "**Status:** ⚠️  Found $issue_count issue(s)" >> spectral-report.md
           echo "" >> spectral-report.md
           echo "### Issues Found:" >> spectral-report.md
