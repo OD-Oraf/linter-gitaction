@@ -120,8 +120,8 @@ runs:
           exit 0
         fi
         
-        # Log markdownlint output in console
-        markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json
+#        # Log markdownlint output in console
+#        markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json
         
         # Run markdownlint and capture output
         if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json > markdownlint-output.txt 2>&1; then
