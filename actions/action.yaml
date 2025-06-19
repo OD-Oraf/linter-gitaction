@@ -55,6 +55,28 @@ runs:
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
         fi
         
+        echo "🔍 Validating OpenAPI file format: ${{ inputs.openapi-file }}"
+        
+        # Check if file has .yaml or .yml extension
+        if [[ "${{ inputs.openapi-file }}" =~ \.(yaml|yml)$ ]]; then
+          echo "✅ OpenAPI file has valid YAML extension"
+        elif [[ "${{ inputs.openapi-file }}" =~ \.json$ ]]; then
+          echo "✅ OpenAPI file has valid JSON extension"
+        else
+          echo "⚠️  OpenAPI file extension is not .yaml, .yml, or .json"
+        fi
+        
+        # Basic file validation
+        if [ -s "${{ inputs.openapi-file }}" ]; then
+          echo "✅ OpenAPI file is not empty"
+        else
+          echo "❌ OpenAPI file is empty"
+          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+          echo "## ❌ OpenAPI File Validation Errors" >> validation-errors.md
+          echo "- OpenAPI file is empty" >> validation-errors.md
+          echo "" >> validation-errors.md
+        fi
+        
         echo "✅ Input validation passed"
         echo "📁 Documentation directory: ${{ inputs.documentation-directory }}"
         echo "📄 OpenAPI file: ${{ inputs.openapi-file }}"
@@ -115,53 +137,10 @@ runs:
           echo "✅ All markdown files passed linting!"
         fi
 
-    - name: Validate OpenAPI file format
-      shell: bash
-      run: |
-        echo "🔍 Validating OpenAPI file format: ${{ inputs.openapi-file }}"
-        
-        # Check if file has .yaml or .yml extension
-        if [[ "${{ inputs.openapi-file }}" =~ \.(yaml|yml)$ ]]; then
-          echo "✅ OpenAPI file has valid YAML extension"
-        elif [[ "${{ inputs.openapi-file }}" =~ \.json$ ]]; then
-          echo "✅ OpenAPI file has valid JSON extension"
-        else
-          echo "⚠️  OpenAPI file extension is not .yaml, .yml, or .json"
-        fi
-        
-        # Basic file validation
-        if [ -s "${{ inputs.openapi-file }}" ]; then
-          echo "✅ OpenAPI file is not empty"
-        else
-          echo "❌ OpenAPI file is empty"
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          echo "## ❌ OpenAPI File Validation Errors" >> validation-errors.md
-          echo "- OpenAPI file is empty" >> validation-errors.md
-          echo "" >> validation-errors.md
-          exit 1
-        fi
-
     - name: Lint OpenAPI specification with Spectral
       shell: bash
       run: |
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
-
-        # Run Spectral linting and capture output
-        if ! spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format stylish > spectral-output.txt 2>&1; then
-          echo "❌ OpenAPI specification failed Spectral validation"
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-
-          # Display errors in console
-          echo "Printing spectral output:"
-          cat spectral-output.txt
-        else
-          echo "✅ OpenAPI specification passed Spectral validation!"
-        fi
-
-    - name: Generate OpenAPI validation report
-      shell: bash
-      run: |
-        echo "📊 Generating detailed OpenAPI validation report..."
         
         # Generate JSON report for potential artifact upload
         spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
@@ -197,20 +176,12 @@ runs:
         fi
         
         echo "📄 OpenAPI validation report generated: spectral-report.md"
-
-    - name: Validate OpenAPI specification structure
-      shell: bash
-      run: |
-        echo "🔍 Performing additional OpenAPI structure validation..."
         
-        # Check for required OpenAPI fields using spectral
-        spectral lint "${{ inputs.openapi-file }}" --ruleset "@stoplight/spectral/rulesets/oas" --format json > structure-check.json 2>/dev/null || echo "[]" > structure-check.json
-        
-        # Count errors vs warnings
-        error_count=$(jq '[.[] | select(.severity == 0)] | length' structure-check.json 2>/dev/null || echo "0")
-        warning_count=$(jq '[.[] | select(.severity == 1)] | length' structure-check.json 2>/dev/null || echo "0")
-        info_count=$(jq '[.[] | select(.severity == 2)] | length' structure-check.json 2>/dev/null || echo "0")
-        hint_count=$(jq '[.[] | select(.severity == 3)] | length' structure-check.json 2>/dev/null || echo "0")
+        # Count errors vs warnings for final validation
+        error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
+        warning_count=$(jq '[.[] | select(.severity == 1)] | length' spectral-report.json 2>/dev/null || echo "0")
+        info_count=$(jq '[.[] | select(.severity == 2)] | length' spectral-report.json 2>/dev/null || echo "0")
+        hint_count=$(jq '[.[] | select(.severity == 3)] | length' spectral-report.json 2>/dev/null || echo "0")
         
         echo "📊 OpenAPI Structure Analysis:"
         echo "  - Errors: $error_count"
@@ -228,13 +199,11 @@ runs:
           # Add OpenAPI errors to validation log
           echo "## ❌ OpenAPI Structural Errors ($error_count errors)" >> validation-errors.md
           echo "" >> validation-errors.md
-          jq -r '.[] | select(.severity == 0) | "- **\(.code)**: \(.message) (Path: \(.path | join(".")))"' structure-check.json >> validation-errors.md 2>/dev/null || echo "- Error parsing OpenAPI issues" >> validation-errors.md
+          jq -r '.[] | select(.severity == 0) | "- **\(.code)**: \(.message) (Path: \(.path | join(".")))"' spectral-report.json >> validation-errors.md 2>/dev/null || echo "- Error parsing OpenAPI issues" >> validation-errors.md
           echo "" >> validation-errors.md
         else
           echo "✅ OpenAPI specification structure is valid"
         fi
-        
-        rm -f structure-check.json
 
     - name: Generate GitHub Step Summary
       shell: bash
