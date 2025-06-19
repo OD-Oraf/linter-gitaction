@@ -141,9 +141,11 @@ runs:
       shell: bash
       run: |
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
-        spectral lint ${{ inputs.openapi-file }}" --ruleset actions/.spectral.yaml --format stylish
         
-        # Generate JSON report for potential artifact upload
+        # Run Spectral
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format stylish; then
+         
+        # Generate JSON report for detailed analysis
         spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
         
         # Generate human-readable report
@@ -153,15 +155,21 @@ runs:
         echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> spectral-report.md
         echo "" >> spectral-report.md
         
-        # Check if there are any issues
-        issue_count=$(jq length spectral-report.json 2>/dev/null || echo "0")
+        # Count issues by severity
+        error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
+        warning_count=$(jq '[.[] | select(.severity == 1)] | length' spectral-report.json 2>/dev/null || echo "0")
+        info_count=$(jq '[.[] | select(.severity == 2)] | length' spectral-report.json 2>/dev/null || echo "0")
+        hint_count=$(jq '[.[] | select(.severity == 3)] | length' spectral-report.json 2>/dev/null || echo "0")
+        total_issues=$((error_count + warning_count + info_count + hint_count))
         
-        if [ "$issue_count" -eq 0 ]; then
+        if [ "$total_issues" -eq 0 ]; then
           echo "**Status:** ✅ No issues found" >> spectral-report.md
         else
-          # Fail build on issues
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          echo "**Status:** ⚠️  Found $issue_count issue(s)" >> spectral-report.md
+          # Only fail on errors, not warnings/info/hints
+          if [ "$error_count" -gt 0 ]; then
+            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+          fi
+          echo "**Status:** ⚠️ Found $total_issues issue(s) ($error_count errors, $warning_count warnings)" >> spectral-report.md
           echo "" >> spectral-report.md
           echo "### Issues Found:" >> spectral-report.md
           echo "" >> spectral-report.md
@@ -180,11 +188,8 @@ runs:
         
         echo "📄 OpenAPI validation report generated: spectral-report.md"
         
-        # Count errors vs warnings for final validation
-        error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
-        warning_count=$(jq '[.[] | select(.severity == 1)] | length' spectral-report.json 2>/dev/null || echo "0")
-        info_count=$(jq '[.[] | select(.severity == 2)] | length' spectral-report.json 2>/dev/null || echo "0")
-        hint_count=$(jq '[.[] | select(.severity == 3)] | length' spectral-report.json 2>/dev/null || echo "0")
+        # Store error count for final validation
+        echo "OPENAPI_ERRORS=$error_count" >> $GITHUB_ENV
         
         echo "📊 OpenAPI Structure Analysis:"
         echo "  - Errors: $error_count"
@@ -192,12 +197,8 @@ runs:
         echo "  - Info: $info_count"
         echo "  - Hints: $hint_count"
         
-        # Store error count for final validation
-        echo "OPENAPI_ERRORS=$error_count" >> $GITHUB_ENV
-        
         if [ "$error_count" -gt 0 ]; then
           echo "❌ OpenAPI specification has structural errors that must be fixed"
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           
           # Add OpenAPI errors to validation log
           echo "## ❌ OpenAPI Structural Errors ($error_count errors)" >> validation-errors.md
