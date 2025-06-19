@@ -11,6 +11,7 @@ paths:
     get:
       summary: List all pets
       operationId: listPets
+      description: Retrieve a list of pets.
       tags:
         - pets
       responses:
