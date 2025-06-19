@@ -143,7 +143,7 @@ runs:
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
         # Run Spectral
-        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format stylish; then
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format stylish
          
         # Generate JSON report for detailed analysis
         spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
