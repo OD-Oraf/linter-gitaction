@@ -191,7 +191,7 @@ runs:
         echo "📊 Generating detailed OpenAPI validation report..."
         
         # Generate JSON report for potential artifact upload
-        spectral lint "${{ inputs.openapi-file }}" --config .spectral.yml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
         
         # Generate human-readable report
         echo "## OpenAPI Validation Report" > spectral-report.md
