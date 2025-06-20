@@ -1,5 +1,5 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://example.com/categories.schema.json",
   "title": "Categories",
   "description": "Schema for categories configuration with tag key-value pairs",
@@ -91,6 +91,7 @@
         "then": {
           "properties": {
             "value": {
+              "type": "string",
               "pattern": "^[A-Z]{2,3}-[0-9]{3,4}$",
               "description": "Cost center code (e.g., IT-001, ENG-1234)",
               "examples": ["IT-001", "ENG-1234", "OPS-567"]
@@ -107,6 +108,7 @@
         "then": {
           "properties": {
             "value": {
+              "type": "string",
               "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
               "minLength": 2,
               "maxLength": 50,
@@ -125,6 +127,7 @@
         "then": {
           "properties": {
             "value": {
+              "type": "string",
               "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\\\.[a-zA-Z]{2,}$",
               "description": "Owner email address",
               "examples": ["john.doe@company.com", "team-platform@company.com"]

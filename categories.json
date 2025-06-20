@@ -1,10 +1,14 @@
 [
   {
     "tagKey" : "Owning Business Group",
-    "value": "Global Platform Service"
+    "value": "Customer Experience"
   },
   {
     "tagKey" : "Data Classification",
-    "value" : "DCL1"
+    "value" : "DCL3"
+  },
+  {
+  "tagKey" : "Application",
+  "value" : "linter-gitaction"
   }
 ]

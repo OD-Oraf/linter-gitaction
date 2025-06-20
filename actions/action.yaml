@@ -156,22 +156,27 @@ runs:
           echo "📄 Validating ${{ inputs.categories-file }} against schema..."
           
           if [ -f "categories-schema.json" ]; then
-            if ajv validate -s categories-schema.json -d "${{ inputs.categories-file }}" --verbose; then
+            # Run AJV with JSON output for better parsing
+            if ajv validate -s categories-schema.json -d "${{ inputs.categories-file }}" --errors=json --strict=false > ajv-errors.json 2>&1; then
               echo "✅ Categories file is valid"
+              echo "[]" > ajv-errors.json  # Empty array for successful validation
             else
               echo "❌ Categories file validation failed"
               echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
               json_errors=$((json_errors + 1))
               
-              # Add to validation log
+              # Extract error details from JSON output
               echo "## ❌ JSON Schema Validation Errors" >> validation-errors.md
               echo "" >> validation-errors.md
               echo "### Categories file validation failed:" >> validation-errors.md
               echo "**File:** \`${{ inputs.categories-file }}\`" >> validation-errors.md
               echo "**Schema:** \`categories-schema.json\`" >> validation-errors.md
               echo "" >> validation-errors.md
+              
+              # Add human-readable error details
+              echo "**Validation Errors:**" >> validation-errors.md
               echo '```' >> validation-errors.md
-              ajv validate -s categories-schema.json -d "${{ inputs.categories-file }}" --verbose 2>&1 || true >> validation-errors.md
+              ajv validate -s categories-schema.json -d "${{ inputs.categories-file }}" --errors=text --verbose --strict=false 2>&1 || true >> validation-errors.md
               echo '```' >> validation-errors.md
               echo "" >> validation-errors.md
             fi
@@ -180,6 +185,7 @@ runs:
           fi
         else
           echo "⚠️  Categories file ${{ inputs.categories-file }} not found, skipping validation"
+          echo "[]" > ajv-errors.json  # Empty array when file doesn't exist
         fi
         
         # Store JSON error count
@@ -379,11 +385,46 @@ runs:
         if [ -f "${{ inputs.categories-file }}" ]; then
           if [ "$JSON_ERRORS" -eq 0 ]; then
             echo "- **Result:** ✅ Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
+            
+            # Show validated items count
+            if [ -f "${{ inputs.categories-file }}" ]; then
+              item_count=$(jq 'length' "${{ inputs.categories-file }}" 2>/dev/null || echo "0")
+              echo "- **Items validated:** $item_count categories" >> $GITHUB_STEP_SUMMARY
+            fi
           else
             echo "- **Result:** ❌ Found $JSON_ERRORS schema validation error(s)" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse and display JSON validation errors
+            if [ -f ajv-errors.json ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### 🚨 Validation Errors" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              # Check if we have JSON errors to parse
+              error_count=$(jq 'length' ajv-errors.json 2>/dev/null || echo "0")
+              if [ "$error_count" -gt 0 ]; then
+                echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
+                echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+                
+                # Parse JSON errors and create table rows
+                jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
+                  echo "| General | Schema validation failed | See error details below | - |" >> $GITHUB_STEP_SUMMARY
+                }
+                
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "### 📋 Error Details" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo '```json' >> $GITHUB_STEP_SUMMARY
+                jq '.' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Error parsing validation results" >> $GITHUB_STEP_SUMMARY
+                echo '```' >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- Validation failed but no detailed errors available" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
           fi
         else
           echo "- **Result:** ⚠️ Categories file not found" >> $GITHUB_STEP_SUMMARY
+          echo "- **Expected location:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
         
