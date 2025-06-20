@@ -1,23 +1,44 @@
 # Documentation and API Validation Action
 
-A GitHub Action that uses [markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli) to lint markdown files and [Spectral](https://github.com/stoplightio/spectral) to validate OpenAPI specifications in your repository.
+A comprehensive GitHub Action that validates documentation, API specifications, and data structures using industry-standard tools. Provides detailed reporting and error analysis for maintaining high-quality project documentation and APIs.
 
 ## Features
 
-- ✅ Lints markdown files using markdownlint-cli
-- 🔍 Validates OpenAPI specifications using Spectral
-- 📁 Configurable documentation directory
-- 📄 Validates OpenAPI file existence and format
-- 🔧 Sensible default configurations for both tools
-- 📊 Detailed logging and summary output
-- 📋 Generates validation reports in JSON and Markdown formats
+- 📝 **Markdown Linting**: Uses [markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli) to ensure consistent markdown formatting
+- 🔍 **OpenAPI Validation**: Uses [Spectral](https://github.com/stoplightio/spectral) to validate OpenAPI specifications
+- 📋 **JSON Schema Validation**: Uses [AJV CLI](https://github.com/ajv-validator/ajv-cli) to validate JSON files against schemas
+- 📊 **Enhanced Reporting**: Generates comprehensive GitHub Step Summaries with detailed error analysis
+- 🎯 **Structured Error Output**: Provides actionable feedback with field-level error details
+- 📁 **Configurable Paths**: Flexible input parameters for different project structures
+- 🔧 **Sensible Defaults**: Works out-of-the-box with minimal configuration
+- 📄 **Multiple Output Formats**: Generates JSON, Markdown, and text reports
+
+## Validation Components
+
+### 1. Markdown Linting
+- Validates markdown files for consistent formatting
+- Configurable rules via `.markdownlint.json`
+- Reports syntax errors, style issues, and formatting problems
+
+### 2. OpenAPI Validation
+- Validates OpenAPI 3.x specifications
+- Uses Spectral ruleset (`.spectral.yaml`)
+- Checks for API design best practices
+- Reports errors, warnings, info, and hints by severity
+
+### 3. JSON Schema Validation
+- Validates JSON files against custom schemas
+- Supports complex validation rules with conditional logic
+- Provides detailed field-level error reporting
+- Shows expected vs actual values for easy debugging
 
 ## Inputs
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `documentation-directory` | Directory containing markdown files to lint | Yes | `./documentation` |
-| `openapi-file` | Path to OpenAPI specification file | Yes | `./openapi.yaml` |
+| `documentation-directory` | Directory containing markdown files to lint | No | `./documentation` |
+| `openapi-file` | Path to OpenAPI specification file | No | `./openapi.yaml` |
+| `categories-file` | Path to categories JSON file for schema validation | No | `./categories.json` |
 
 ## Usage
 
@@ -41,6 +62,7 @@ jobs:
         with:
           documentation-directory: './docs'
           openapi-file: './api/openapi.yaml'
+          categories-file: './config/categories.json'
 ```
 
 ### Advanced Usage with Report Upload
@@ -50,108 +72,144 @@ name: Documentation Quality Check
 
 on:
   push:
-    paths:
-      - 'docs/**/*.md'
-      - 'openapi.yaml'
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  validate-docs-and-api:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Validate documentation and API
+      - uses: actions/checkout@v4
+      
+      - name: Validate Documentation and APIs
         uses: ./actions
         with:
-          documentation-directory: './docs'
+          documentation-directory: './documentation'
           openapi-file: './openapi.yaml'
-          
-      - name: Upload validation reports
+          categories-file: './categories.json'
+      
+      - name: Upload Validation Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: validation-reports
           path: |
-            .markdownlint.json
-            .spectral.yml
             spectral-report.json
             spectral-report.md
+            ajv-errors.json
+            validation-errors.md
           retention-days: 30
 ```
 
-## Tool Configurations
+## Output Reports
 
-### Markdownlint Configuration
+The action generates several types of reports:
 
-The action creates a `.markdownlint.json` configuration file with the following rules:
+### GitHub Step Summary
+- **📊 Validation Summary Table**: At-a-glance status of all components
+- **📝 Markdown Details**: File counts, tool info, and results
+- **🔍 OpenAPI Details**: Issue breakdown by severity with descriptions
+- **📋 Categories Details**: Schema validation with structured error tables
+- **🚨 Error Details**: Consolidated error information when validation fails
+- **📄 Generated Artifacts**: List of available report files
+- **🔧 Next Steps**: Component-specific guidance for fixing issues
 
-- **Line length**: Maximum 120 characters (excluding code blocks and tables)
-- **HTML elements**: Allows `<br>`, `<sub>`, and `<sup>` tags
-- **First line heading**: Disabled (MD041)
-- **Default rules**: All other markdownlint rules are enabled
+### Validation Reports
+- `spectral-report.json` - Machine-readable OpenAPI validation results
+- `spectral-report.md` - Human-readable OpenAPI validation report
+- `ajv-errors.json` - Structured JSON schema validation errors
+- `validation-errors.md` - Consolidated error log with detailed information
 
-### Spectral Configuration
+### Error Table Format (JSON Schema)
+When JSON schema validation fails, you'll see a structured table:
 
-The action creates a `.spectral.yml` configuration file with enhanced OpenAPI validation rules:
+| Field | Issue | Expected | Actual |
+|-------|-------|----------|--------|
+| `/1/value` | must be equal to one of allowed values | DCL1, DCL2, DCL3, DCL4 | `""` |
+| `/2/tagKey` | must be equal to one of allowed values | Environment, Application, Owner | `"InvalidKey"` |
 
-- **Required fields**: Contact info, descriptions, and licenses
-- **Operations**: Must have descriptions, unique operation IDs, and defined tags
-- **Parameters**: Must have descriptions and proper validation
-- **Security**: Security schemes must be properly defined
-- **Naming**: Schema names should follow PascalCase convention
-- **Servers**: API servers must be properly configured
+## Configuration Files
 
-## What Gets Validated
+### Markdownlint Configuration (`.markdownlint.json`)
+```json
+{
+  "MD013": false,
+  "MD033": false,
+  "MD041": false
+}
+```
 
-### Markdown Files
-1. **Input Validation**: Verifies that the documentation directory exists
-2. **Markdown Linting**: Runs markdownlint on all `.md` files in the specified directory
-3. **Summary Report**: Provides a summary of linting results
+### Spectral Configuration (`.spectral.yaml`)
+```yaml
+extends: ["spectral:oas"]
+rules:
+  info-contact: error
+  info-description: error
+  operation-description: error
+  operation-operationId-unique: error
+  operation-parameters: error
+  operation-tag-defined: error
+```
 
-### OpenAPI Specification
-1. **File Validation**: Verifies the OpenAPI file exists and is not empty
-2. **Format Validation**: Checks for valid YAML/JSON format
-3. **Spectral Linting**: Validates against OpenAPI standards and best practices
-4. **Structure Validation**: Performs additional structural checks
-5. **Report Generation**: Creates detailed validation reports
+### Categories Schema (`categories-schema.json`)
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Categories",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "tagKey": {
+        "type": "string",
+        "enum": ["Environment", "Application", "Owner"]
+      },
+      "value": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": ["tagKey", "value"],
+    "additionalProperties": false
+  }
+}
+```
 
-## Generated Reports
+## Default Spectral Rules
 
-The action generates several reports:
+The action uses Spectral's OpenAPI ruleset with additional custom rules:
 
-- **`.markdownlint.json`**: Markdownlint configuration used
-- **`spectral-report.json`**: Machine-readable Spectral validation results
-- **`spectral-report.md`**: Human-readable Spectral validation report with issue breakdown
+### Error Level Rules
+- **info-contact**: API must have contact information
+- **info-description**: API must have description
+- **operation-description**: All operations must have descriptions
+- **operation-operationId-unique**: Operation IDs must be unique
+- **operation-parameters**: Parameters must be properly defined
+- **operation-tag-defined**: All tags must be defined in the global tags list
+- **oas3-operation-security-defined**: Security requirements must be defined
+
+### Warning Level Rules
+- **operation-tags**: Operations should have tags
+- **openapi-tags**: Should define global tags
+- **info-license**: Should include license information
 
 ## Error Handling
 
-The action will fail if:
-- The documentation directory doesn't exist
-- The OpenAPI file doesn't exist or is empty
-- Any markdown files fail linting rules
-- The OpenAPI specification has structural errors (severity: error)
-- Spectral validation finds critical issues
+The action provides comprehensive error handling:
 
-Warnings and informational messages will be reported but won't fail the action.
+- **Graceful Failures**: Continues validation even when individual components fail
+- **Detailed Logging**: Captures and reports specific error details
+- **Structured Output**: Provides machine-readable and human-readable error formats
+- **Actionable Feedback**: Shows exactly what needs to be fixed and where
+- **File Existence Checks**: Handles missing files gracefully with clear messaging
 
-## Requirements
+## Tool Versions
 
-- Node.js 18+ (automatically installed by the action)
-- Ubuntu runner (recommended)
-- `jq` for JSON processing (available on GitHub runners)
-
-## Spectral Rules Applied
-
-The action applies comprehensive OpenAPI validation rules including:
-
-- **info-contact**: API must have contact information
-- **info-description**: API must have a description
-- **operation-description**: All operations must have descriptions
-- **operation-operationId-unique**: Operation IDs must be unique
-- **path-keys-no-trailing-slash**: Paths should not have trailing slashes
-- **oas3-api-servers**: OpenAPI 3.x must define servers
-- **oas3-operation-security-defined**: Security requirements must be defined
+- **Node.js**: 18.x
+- **markdownlint-cli**: Latest
+- **@stoplight/spectral-cli**: Latest  
+- **ajv-cli**: Latest
 
 ## Contributing
 
