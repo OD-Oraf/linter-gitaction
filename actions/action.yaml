@@ -273,98 +273,121 @@ runs:
         
         # Overall status
         if [ "$VALIDATION_FAILED" = "true" ]; then
-          echo "## ❌ Validation Status: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "## ❌ Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
         else
-          echo "## ✅ Validation Status: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Overall Status: PASSED" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Markdown Linting Summary
-        echo "## 📝 Markdown Linting Results" >> $GITHUB_STEP_SUMMARY
+        # Summary table
+        echo "## 📊 Validation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status | Errors | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Markdown row
+        md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
+        if [ $md_count -eq 0 ]; then
+          echo "| 📝 Markdown | ⚠️ No files | 0 | $md_count files found |" >> $GITHUB_STEP_SUMMARY
+        elif [ "$MARKDOWN_ERRORS" -gt 0 ]; then
+          echo "| 📝 Markdown | ❌ Failed | $MARKDOWN_ERRORS | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| 📝 Markdown | ✅ Passed | 0 | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # OpenAPI row
+        if [ "$OPENAPI_ERRORS" -gt 0 ]; then
+          echo "| 🔍 OpenAPI | ❌ Failed | $OPENAPI_ERRORS | Spectral validation |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| 🔍 OpenAPI | ✅ Passed | 0 | Spectral validation |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Categories row
+        if [ "$JSON_ERRORS" -gt 0 ]; then
+          echo "| 📋 Categories | ❌ Failed | $JSON_ERRORS | Schema validation |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| 📋 Categories | ✅ Passed | 0 | Schema validation |" >> $GITHUB_STEP_SUMMARY
+        fi
+        
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
+        # Detailed Markdown Section
+        echo "## 📝 Markdown Linting Details" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **Directory:** \`${{ inputs.documentation-directory }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "- **Files processed:** $md_count markdown files" >> $GITHUB_STEP_SUMMARY
+        echo "- **Files found:** $md_count markdown files" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tool:** markdownlint-cli" >> $GITHUB_STEP_SUMMARY
         
         if [ $md_count -eq 0 ]; then
-          echo "- **Status:** ⚠️ No markdown files found" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** ⚠️ No markdown files found to lint" >> $GITHUB_STEP_SUMMARY
         elif [ "$MARKDOWN_ERRORS" -gt 0 ]; then
-          echo "- **Status:** ❌ Found $MARKDOWN_ERRORS linting issues" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** ❌ Found $MARKDOWN_ERRORS linting issues" >> $GITHUB_STEP_SUMMARY
         else
-          echo "- **Status:** ✅ All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** ✅ All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        # OpenAPI Validation Summary
-        echo "## 🔍 OpenAPI Validation Results" >> $GITHUB_STEP_SUMMARY
+        # Detailed OpenAPI Section
+        echo "## 🔍 OpenAPI Validation Details" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **File:** \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tool:** Spectral CLI" >> $GITHUB_STEP_SUMMARY
+        echo "- **Ruleset:** \`.spectral.yaml\`" >> $GITHUB_STEP_SUMMARY
         
-        # Add Spectral report content if it exists
-        if [ -f spectral-report.md ]; then
-          # Extract status from the spectral report
-          if grep -q "No issues found" spectral-report.md; then
-            echo "- **Status:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
-          else
-            issue_count=$(jq length spectral-report.json 2>/dev/null || echo "0")
-            echo "- **Status:** ⚠️ Found $issue_count issue(s)" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # Add detailed Spectral results
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Detailed OpenAPI Analysis" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Add the spectral report content (skip the header since we have our own)
-          tail -n +4 spectral-report.md >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- **Status:** ✅ Validation passed" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # JSON Schema Validation Summary
-        echo "## 📋 JSON Schema Validation Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "$JSON_ERRORS" -eq 0 ]; then
-          echo "- **Status:** ✅ Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- **Status:** ❌ Found $JSON_ERRORS JSON schema validation error(s)" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        # List validated files
-        if [ -f "${{ inputs.categories-file }}" ]; then
-          echo "- **Files validated:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
-          if [ -f "categories-schema.json" ]; then
-            echo "- **Schema used:** \`categories-schema.json\`" >> $GITHUB_STEP_SUMMARY
-          fi
-        else
-          echo "- **Files validated:** None found (expected: \`${{ inputs.categories-file }}\`)" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Add issue breakdown if spectral report exists
         if [ -f spectral-report.json ]; then
           error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
           warning_count=$(jq '[.[] | select(.severity == 1)] | length' spectral-report.json 2>/dev/null || echo "0")
           info_count=$(jq '[.[] | select(.severity == 2)] | length' spectral-report.json 2>/dev/null || echo "0")
           hint_count=$(jq '[.[] | select(.severity == 3)] | length' spectral-report.json 2>/dev/null || echo "0")
           
+          if [ "$error_count" -gt 0 ]; then
+            echo "- **Result:** ❌ Found $error_count error(s), $warning_count warning(s)" >> $GITHUB_STEP_SUMMARY
+          elif [ "$warning_count" -gt 0 ]; then
+            echo "- **Result:** ⚠️ Found $warning_count warning(s), $info_count info(s)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Result:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📊 Issue Breakdown" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔴 Errors | $error_count |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🟡 Warnings | $warning_count |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔵 Info | $info_count |" >> $GITHUB_STEP_SUMMARY
-          echo "| 💡 Hints | $hint_count |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Errors | $error_count | Must be fixed |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Warnings | $warning_count | Should be reviewed |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔵 Info | $info_count | Informational |" >> $GITHUB_STEP_SUMMARY
+          echo "| 💡 Hints | $hint_count | Suggestions |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f spectral-report.md ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📋 Detailed Analysis" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            tail -n +4 spectral-report.md >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "- **Result:** ✅ Validation passed" >> $GITHUB_STEP_SUMMARY
         fi
+        echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Add error details if validation failed
+        # Detailed Categories Section
+        echo "## 📋 Categories Schema Validation Details" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **File:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Schema:** \`categories-schema.json\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tool:** AJV CLI" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "${{ inputs.categories-file }}" ]; then
+          if [ "$JSON_ERRORS" -eq 0 ]; then
+            echo "- **Result:** ✅ Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Result:** ❌ Found $JSON_ERRORS schema validation error(s)" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "- **Result:** ⚠️ Categories file not found" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Error details section (only if there are errors)
         if [ "$VALIDATION_FAILED" = "true" ] && [ -f validation-errors.md ]; then
           echo "## 🚨 Error Details" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -372,30 +395,59 @@ runs:
           echo "" >> $GITHUB_STEP_SUMMARY
         fi
         
-        # Add artifacts information
+        # Generated artifacts section
         echo "## 📄 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "The following validation reports have been generated:" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- \`spectral-report.json\` - Machine-readable OpenAPI validation results" >> $GITHUB_STEP_SUMMARY
-        echo "- \`spectral-report.md\` - Human-readable OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
-        echo "- \`.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
-        echo "- \`.spectral.yml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
+        
+        artifacts_found=false
+        if [ -f spectral-report.json ]; then
+          echo "- \`spectral-report.json\` - Machine-readable OpenAPI validation results" >> $GITHUB_STEP_SUMMARY
+          artifacts_found=true
+        fi
+        if [ -f spectral-report.md ]; then
+          echo "- \`spectral-report.md\` - Human-readable OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
+          artifacts_found=true
+        fi
+        if [ -f .markdownlint.json ]; then
+          echo "- \`.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
+          artifacts_found=true
+        fi
+        if [ -f .spectral.yml ]; then
+          echo "- \`.spectral.yml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
+          artifacts_found=true
+        fi
         if [ -f validation-errors.md ]; then
           echo "- \`validation-errors.md\` - Detailed error log" >> $GITHUB_STEP_SUMMARY
+          artifacts_found=true
+        fi
+        
+        if [ "$artifacts_found" = false ]; then
+          echo "- No artifacts generated (all validations passed)" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        # Add next steps if there are issues
+        # Next steps section (only if there are failures)
         if [ "$VALIDATION_FAILED" = "true" ]; then
           echo "## 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "To resolve the identified issues:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review the error details above" >> $GITHUB_STEP_SUMMARY
-          echo "2. Download the \`validation-errors.md\` artifact for complete error log" >> $GITHUB_STEP_SUMMARY
-          echo "3. Fix the issues in your documentation and/or OpenAPI specification" >> $GITHUB_STEP_SUMMARY
-          echo "4. Re-run the validation to verify fixes" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Review the error details above** for specific issues" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Download artifacts** for complete error logs and reports" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$MARKDOWN_ERRORS" -gt 0 ]; then
+            echo "3. **Fix markdown issues** in \`${{ inputs.documentation-directory }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$OPENAPI_ERRORS" -gt 0 ]; then
+            echo "4. **Fix OpenAPI issues** in \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$JSON_ERRORS" -gt 0 ]; then
+            echo "5. **Fix categories schema issues** in \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "6. **Re-run the validation** to verify fixes" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
         fi
         
