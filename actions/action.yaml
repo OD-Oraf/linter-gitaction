@@ -470,60 +470,10 @@ runs:
             echo "- **Items validated:** $item_count categories" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Result:** ❌ Found $JSON_ERRORS schema validation error(s)" >> $GITHUB_STEP_SUMMARY
-            
-            # Parse and display JSON validation errors
-            if [ -f ajv-errors.json ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### 🚨 Category Validation Errors" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              
-              # Check if we have JSON errors to parse
-              error_count=$(jq 'length' ajv-errors.json 2>/dev/null || echo "0")
-              if [ "$error_count" -gt 0 ]; then
-                # Check for enum errors specifically
-                if jq -e '.[] | select(.keyword == "enum")' ajv-errors.json >/dev/null 2>&1; then
-                  # Enhanced error reporting with tagKey context
-                  echo "| TagKey | Invalid Value | Allowed Values |" >> $GITHUB_STEP_SUMMARY
-                  echo "|--------|---------------|----------------|" >> $GITHUB_STEP_SUMMARY
-                  
-                  # Use jq to parse and format errors with tagKey context
-                  jq -r --slurpfile data "${{ inputs.categories-file }}" '
-                  .[] | select(.keyword == "enum") | 
-                  . as $error |
-                  ($error.instancePath | split("/") | map(select(. != ""))) as $pathParts |
-                  ($pathParts[0] | tonumber) as $index |
-                  $data[0][$index].tagKey as $tagKey |
-                  ($pathParts | reduce .[] as $part (
-                    $data[0]; 
-                    if ($part | test("^[0-9]+$")) then .[$part | tonumber] else .[$part] end
-                  )) as $invalidValue |
-                  "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
-                  ' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
-                    # If enhanced error reporting fails, fall back to a simpler format
-                    echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
-                    echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-                    jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
-                      # If all JSON parsing fails, add a generic error message
-                      echo "| General | Schema validation failed | See validation-errors.md for details | - |" >> $GITHUB_STEP_SUMMARY
-                    }
-                  }
-                else
-                  # For non-enum errors, show generic format
-                  echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
-                  echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-                  jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
-                    echo "| General | Schema validation failed | See validation-errors.md for details | - |" >> $GITHUB_STEP_SUMMARY
-                  }
-                fi
-              else
-                echo "⚠️ Validation failed but no detailed errors available" >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "⚠️ Error details not available (ajv-errors.json not found)" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "- **Details:** See validation errors section below for detailed breakdown" >> $GITHUB_STEP_SUMMARY
           fi
         else
-          echo "⚠️ Categories file not found, validation skipped" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** ⚠️ Categories file not found, validation skipped" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
