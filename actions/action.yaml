@@ -176,9 +176,10 @@ runs:
             echo "🔍 Running validation with AJV..."
             # Run AJV with JSON output for better parsing (output to temporary file)
             ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > temp-ajv-output.txt 2>&1
+            ajv_exit_code=$?
             
             # Check exit status directly
-            if [ $? -eq 0 ]; then
+            if [ $ajv_exit_code -eq 0 ]; then
               echo "✅ Categories file is valid"
               # Create empty JSON array for successful validation
               echo "[]" > ajv-errors.json
