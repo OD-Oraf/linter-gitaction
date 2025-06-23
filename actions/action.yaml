@@ -27,26 +27,42 @@ runs:
     - name: Install CLI tools
       shell: bash
       run: |
+        echo "=================================================="
+        echo "🔧 INSTALLING CLI TOOLS"
+        echo "=================================================="
         npm install -g markdownlint-cli
         npm install -g @stoplight/spectral-cli
         npm install -g ajv-cli
         echo "✅ Installed markdownlint-cli, spectral-cli, and ajv-cli"
+        echo "=================================================="
       
     - name: Initialize validation state
       shell: bash
       run: |
+        echo "=================================================="
+        echo "🚀 INITIALIZING VALIDATION STATE"
+        echo "=================================================="
         echo "VALIDATION_FAILED=false" >> $GITHUB_ENV
         echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
         echo "OPENAPI_ERRORS=0" >> $GITHUB_ENV
         echo "JSON_ERRORS=0" >> $GITHUB_ENV
         echo "# Validation Error Log" > validation-errors.md
         echo "" >> validation-errors.md
+        echo "✅ Validation state initialized"
+        echo "=================================================="
         
     - name: Validate inputs
       shell: bash
       run: |
+        echo "=================================================="
+        echo "🔍 VALIDATING INPUT PARAMETERS"
+        echo "=================================================="
+        echo "📁 Documentation directory: ${{ inputs.documentation-directory }}"
+        echo "📄 OpenAPI file: ${{ inputs.openapi-file }}"
+        echo "📋 Categories file: ${{ inputs.categories-file }}"
+        echo ""
         if [ ! -d "${{ inputs.documentation-directory }}" ]; then
-          echo "Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
+          echo "❌ Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
           echo "## ❌ Input Validation Errors" >> validation-errors.md
           echo "- Documentation directory '${{ inputs.documentation-directory }}' does not exist" >> validation-errors.md
           echo "" >> validation-errors.md
@@ -90,7 +106,15 @@ runs:
     - name: Lint markdown files
       shell: bash
       run: |
-        echo "🔍 Linting markdown files in ${{ inputs.documentation-directory }}"
+        echo "=================================================="
+        echo "📝 LINTING MARKDOWN FILES"
+        echo "=================================================="
+        echo "🔍 Scanning directory: ${{ inputs.documentation-directory }}"
+        echo "📋 Using config: ${{ github.action_path }}/documentation-config/.markdownlint.json"
+        echo ""
+        
+        # Initialize markdown validation state
+        markdown_errors=0
         
         # Count markdown files
         md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
@@ -123,10 +147,22 @@ runs:
         else
           echo "✅ All markdown files passed linting!"
         fi
+        
+        echo ""
+        echo "=================================================="
+        echo "✅ MARKDOWN LINTING COMPLETED"
+        echo "=================================================="
 
     - name: Validate Categories file against schema
       shell: bash
       run: |
+        echo "=================================================="
+        echo "📋 VALIDATING CATEGORIES FILE"
+        echo "=================================================="
+        echo "🔍 Categories file: ${{ inputs.categories-file }}"
+        echo "📋 Schema file: ${{ github.action_path }}/categories-config/categories-schema.json"
+        echo ""
+        
         echo "🔍 Validating categories file against schema..."
         
         # Initialize JSON validation state
@@ -159,28 +195,35 @@ runs:
                 echo "**Detailed Validation Errors:**" >> validation-errors.md
                 echo "" >> validation-errors.md
                 
-                # Use jq to parse and format errors with tagKey context
-                ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false 2>&1 | tail -n +2 | jq -r --slurpfile data "${{ inputs.categories-file }}" '
-                .[] | select(.keyword == "enum") | 
-                . as $error |
-                ($error.instancePath | split("/") | map(select(. != ""))) as $pathParts |
-                ($pathParts[0] | tonumber) as $index |
-                $data[0][$index].tagKey as $tagKey |
-                ($pathParts | reduce .[] as $part (
-                  $data[0]; 
-                  if ($part | test("^[0-9]+$")) then .[$part | tonumber] else .[$part] end
-                )) as $invalidValue |
-                "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
-                ' 2>/dev/null | {
-                  if [ -s /dev/stdin ]; then
-                    echo "| TagKey | Invalid Value | Allowed Values |"
-                    echo "|--------|---------------|----------------|"
-                    cat
-                  else
-                    echo "_No enum validation errors found._"
-                  fi
-                } >> validation-errors.md
+                # Generate enhanced error report in a more robust way
+                ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > temp-ajv-errors.json 2>/dev/null || true
                 
+                # Check if we have enum errors and process them
+                if tail -n +2 temp-ajv-errors.json | jq -e '.[] | select(.keyword == "enum")' >/dev/null 2>&1; then
+                  echo "| TagKey | Invalid Value | Allowed Values |" >> validation-errors.md
+                  echo "|--------|---------------|----------------|" >> validation-errors.md
+                  
+                  # Process each enum error
+                  tail -n +2 temp-ajv-errors.json | jq -r --slurpfile data "${{ inputs.categories-file }}" '
+                  .[] | select(.keyword == "enum") | 
+                  . as $error |
+                  ($error.instancePath | split("/") | map(select(. != ""))) as $pathParts |
+                  ($pathParts[0] | tonumber) as $index |
+                  $data[0][$index].tagKey as $tagKey |
+                  ($pathParts | reduce .[] as $part (
+                    $data[0]; 
+                    if ($part | test("^[0-9]+$")) then .[$part | tonumber] else .[$part] end
+                  )) as $invalidValue |
+                  "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
+                  ' >> validation-errors.md 2>/dev/null || {
+                    echo "| General | Enhanced parsing failed | See raw errors below | - |" >> validation-errors.md
+                  }
+                else
+                  echo "_No enum validation errors found in JSON output._" >> validation-errors.md
+                fi
+                
+                # Clean up temp file
+                rm -f temp-ajv-errors.json
                 echo "" >> validation-errors.md
               fi
               
@@ -207,10 +250,22 @@ runs:
         else
           echo "❌ Found $json_errors JSON schema validation error(s)"
         fi
+        
+        echo ""
+        echo "=================================================="
+        echo "✅ CATEGORIES VALIDATION COMPLETED"
+        echo "=================================================="
 
     - name: Lint OpenAPI specification with Spectral
       shell: bash
       run: |
+        echo "=================================================="
+        echo "🔧 LINTING OPENAPI SPECIFICATION"
+        echo "=================================================="
+        echo "🔍 OpenAPI file: ${{ inputs.openapi-file }}"
+        echo "📋 Spectral ruleset: ${{ github.action_path }}/api-spec-config/.spectral.yaml"
+        echo ""
+        
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
         # Run Spectral
@@ -279,10 +334,21 @@ runs:
         else
           echo "✅ OpenAPI specification structure is valid"
         fi
+        
+        echo ""
+        echo "=================================================="
+        echo "✅ OPENAPI VALIDATION COMPLETED"
+        echo "=================================================="
 
     - name: Generate GitHub Step Summary
       shell: bash
       run: |
+        echo "=================================================="
+        echo "📊 GENERATING GITHUB STEP SUMMARY"
+        echo "=================================================="
+        echo "📝 Creating validation report..."
+        echo ""
+        
         echo "# 📋 Documentation and API Validation Report" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Validation completed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
@@ -533,6 +599,16 @@ runs:
     - name: Final validation check
       shell: bash
       run: |
+        echo "=================================================="
+        echo "🏁 FINAL VALIDATION CHECK"
+        echo "=================================================="
+        echo "🔍 Checking overall validation status..."
+        echo "📊 MARKDOWN_ERRORS: $MARKDOWN_ERRORS"
+        echo "📊 OPENAPI_ERRORS: $OPENAPI_ERRORS" 
+        echo "📊 JSON_ERRORS: $JSON_ERRORS"
+        echo "📊 VALIDATION_FAILED: $VALIDATION_FAILED"
+        echo ""
+        
         echo "🔍 Performing final validation check..."
         echo ""
         echo "📊 Final Summary:"
@@ -555,6 +631,10 @@ runs:
           echo "📋 GitHub Step Summary has been updated with detailed results and error information"
           echo ""
           echo "Please review the errors above and in the step summary, then fix the issues before re-running."
+          echo ""
+          echo "=================================================="
+          echo "❌ VALIDATION FAILED - BUILD WILL FAIL"
+          echo "=================================================="
           exit 1
         else
           echo "✅ All validation checks passed!"
@@ -563,7 +643,11 @@ runs:
           echo "  - spectral-report.json (machine-readable)"
           echo "  - spectral-report.md (human-readable)"
           echo ""
-          echo "📋 GitHub Step Summary has been updated with detailed results"
+          echo "📋 GitHub Step Summary has been updated with validation results"
+          echo ""
+          echo "=================================================="
+          echo "🎉 ALL VALIDATIONS PASSED - BUILD SUCCESS"
+          echo "=================================================="
         fi
 
 branding:
