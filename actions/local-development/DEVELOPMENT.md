@@ -35,16 +35,16 @@ npm run fix:markdown
 #### Using Local Configurations:
 ```bash
 # Lint markdown
-markdownlint documentation/**/*.md --config actions/documentation/.markdownlint.json
+markdownlint documentation/**/*.md --config actions/documentation-config/.markdownlint.json
 
-# Lint OpenAPI (if actions/api-spec/.spectral.yaml exists)
-spectral lint --ruleset actions/api-spec/.spectral.yaml
+# Lint OpenAPI (if actions/api-spec-config/.spectral.yaml exists)
+spectral lint --ruleset actions/api-spec-config/.spectral.yaml
 
 # Validate JSON schema
-ajv validate --spec=draft7 --errors=json -s actions/categories/categories-schema.json -d categories.json
+ajv validate --spec=draft7 --errors=json -s actions/categories-config/categories-schema.json -d categories.json
 
 # Fix markdown automatically
-markdownlint documentation/**/*.md --config actions/documentation/.markdownlint.json --fix
+markdownlint documentation/**/*.md --config actions/documentation-config/.markdownlint.json --fix
 ```
 
 #### Using Remote Configurations:
@@ -111,9 +111,9 @@ ajv validate --spec=draft7 -s .cache/remote-configs/categories-schema.json -d ca
 ## Configuration Files
 
 ### Local Configurations:
-- **Markdown**: `actions/documentation/.markdownlint.json`
-- **OpenAPI**: `actions/api-spec/.spectral.yaml`
-- **JSON Schema**: `actions/categories/categories-schema.json`
+- **Markdown**: `actions/documentation-config/.markdownlint.json`
+- **OpenAPI**: `actions/api-spec-config/.spectral.yaml`
+- **JSON Schema**: `actions/categories-config/categories-schema.json`
 
 ### Remote Configurations (Example URLs):
 - **Markdown**: `https://raw.githubusercontent.com/your-org/shared-configs/main/markdownlint/.markdownlint.json`

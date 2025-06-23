@@ -102,7 +102,7 @@ runs:
         fi
            
         # Run markdownlint and capture output
-        if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config "${{ github.action_path }}/documentation/.markdownlint.json" > markdownlint-output.txt 2>&1; then
+        if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config "${{ github.action_path }}/documentation-config/.markdownlint.json" > markdownlint-output.txt 2>&1; then
           echo "❌ Markdown linting failed"
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           
@@ -136,9 +136,9 @@ runs:
         if [ -f "${{ inputs.categories-file }}" ]; then
           echo "📄 Validating ${{ inputs.categories-file }} against schema..."
           
-          if [ -f "${{ github.action_path }}/categories/categories-schema.json" ]; then
+          if [ -f "${{ github.action_path }}/categories-config/categories-schema.json" ]; then
             # Run AJV with JSON output for better parsing
-            if ajv validate -s "${{ github.action_path }}/categories/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > ajv-errors.json 2>&1; then
+            if ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > ajv-errors.json 2>&1; then
               echo "✅ Categories file is valid"
               echo "[]" > ajv-errors.json  # Empty array for successful validation
             else
@@ -157,12 +157,12 @@ runs:
               # Add human-readable error details
               echo "**Validation Errors:**" >> validation-errors.md
               echo '```' >> validation-errors.md
-              ajv validate -s "${{ github.action_path }}/categories/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=text --verbose --strict=false 2>&1 || true >> validation-errors.md
+              ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=text --verbose --strict=false 2>&1 || true >> validation-errors.md
               echo '```' >> validation-errors.md
               echo "" >> validation-errors.md
             fi
           else
-            echo "⚠️  categories-schema.json not found at ${{ github.action_path }}/categories/, skipping validation"
+            echo "⚠️  categories-schema.json not found at ${{ github.action_path }}/categories-config/, skipping validation"
           fi
         else
           echo "⚠️  Categories file ${{ inputs.categories-file }} not found, skipping validation"
@@ -184,10 +184,10 @@ runs:
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
         # Run Spectral
-        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec/.spectral.yaml --format stylish
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec-config/.spectral.yaml --format stylish
          
         # Generate JSON report for detailed analysis
-        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec-config/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
         
         # Generate human-readable report
         echo "## OpenAPI Validation Report" > spectral-report.md
@@ -432,12 +432,12 @@ runs:
           echo "- \`spectral-report.md\` - Human-readable OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
           artifacts_found=true
         fi
-        if [ -f "${{ github.action_path }}/documentation/.markdownlint.json" ]; then
-          echo "- \`${{ github.action_path }}/documentation/.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
+        if [ -f "${{ github.action_path }}/documentation-config/.markdownlint.json" ]; then
+          echo "- \`${{ github.action_path }}/documentation-config/.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
           artifacts_found=true
         fi
-        if [ -f "${{ github.action_path }}/api-spec/.spectral.yaml" ]; then
-          echo "- \`${{ github.action_path }}/api-spec/.spectral.yaml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
+        if [ -f "${{ github.action_path }}/api-spec-config/.spectral.yaml" ]; then
+          echo "- \`${{ github.action_path }}/api-spec-config/.spectral.yaml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
           artifacts_found=true
         fi
         if [ -f validation-errors.md ]; then

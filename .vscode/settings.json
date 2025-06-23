@@ -15,7 +15,7 @@
   "json.schemas": [
     {
       "fileMatch": ["categories.json"],
-      "url": "./actions/categories/categories-schema.json"
+      "url": "./actions/categories-config/categories-schema.json"
     }
   ],
   "yaml.schemas": {
@@ -27,5 +27,5 @@
     ]
   },
   "spectral.enable": true,
-  "spectral.rulesetFile": "./actions/api-spec/.spectral.yaml"
+  "spectral.rulesetFile": "./actions/api-spec-config/.spectral.yaml"
 }

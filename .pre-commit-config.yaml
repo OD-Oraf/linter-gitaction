@@ -3,21 +3,21 @@ repos:
     rev: v0.37.0
     hooks:
       - id: markdownlint
-        args: ['--config', 'actions/documentation/.markdownlint.json']
+        args: ['--config', 'actions/documentation-config/.markdownlint.json']
         files: \.md$
 
   - repo: https://github.com/stoplightio/spectral
     rev: v6.11.0
     hooks:
       - id: spectral-lint
-        args: ['--ruleset', 'actions/api-spec/.spectral.yaml']
+        args: ['--ruleset', 'actions/api-spec-config/.spectral.yaml']
         files: \.(yaml|yml|json)$
 
   - repo: local
     hooks:
       - id: json-schema-validate
         name: Validate JSON Schema
-        entry: ajv validate --spec=draft7 -s actions/categories/categories-schema.json -d categories.json
+        entry: ajv validate --spec=draft7 -s actions/categories-config/categories-schema.json -d categories.json
         language: node
         additional_dependencies: ['ajv-cli@5.0.0']
         files: categories\.json$
