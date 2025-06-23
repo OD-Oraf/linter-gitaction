@@ -173,14 +173,28 @@ runs:
           echo "📄 Validating ${{ inputs.categories-file }} against schema..."
           
           if [ -f "${{ github.action_path }}/categories-config/categories-schema.json" ]; then
-            # Run AJV with JSON output for better parsing
-            if ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > ajv-errors.json 2>&1; then
+            echo "🔍 Running validation with AJV..."
+            # Run AJV with JSON output for better parsing (output to temporary file)
+            ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > temp-ajv-output.txt 2>&1
+            
+            # Check exit status directly
+            if [ $? -eq 0 ]; then
               echo "✅ Categories file is valid"
-              echo "[]" > ajv-errors.json  # Empty array for successful validation
+              # Create empty JSON array for successful validation
+              echo "[]" > ajv-errors.json
             else
               echo "❌ Categories file validation failed"
               echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
               json_errors=$((json_errors + 1))
+              
+              # Strip the first line (AJV status line) and save clean JSON
+              tail -n +2 temp-ajv-output.txt > ajv-errors.json
+              
+              # Verify we have proper JSON (safety check)
+              if ! jq empty ajv-errors.json 2>/dev/null; then
+                echo "⚠️ Warning: Could not parse AJV output as JSON. Using fallback error reporting."
+                echo "[]" > ajv-errors.json
+              fi
               
               # Generate enhanced error report with tagKey and invalid values
               echo "## ❌ JSON Schema Validation Errors" >> validation-errors.md
@@ -195,16 +209,13 @@ runs:
                 echo "**Detailed Validation Errors:**" >> validation-errors.md
                 echo "" >> validation-errors.md
                 
-                # Generate enhanced error report in a more robust way
-                ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false > temp-ajv-errors.json 2>/dev/null || true
-                
                 # Check if we have enum errors and process them
-                if tail -n +2 temp-ajv-errors.json | jq -e '.[] | select(.keyword == "enum")' >/dev/null 2>&1; then
+                if jq -e '.[] | select(.keyword == "enum")' ajv-errors.json >/dev/null 2>&1; then
                   echo "| TagKey | Invalid Value | Allowed Values |" >> validation-errors.md
                   echo "|--------|---------------|----------------|" >> validation-errors.md
                   
                   # Process each enum error
-                  tail -n +2 temp-ajv-errors.json | jq -r --slurpfile data "${{ inputs.categories-file }}" '
+                  jq -r --slurpfile data "${{ inputs.categories-file }}" '
                   .[] | select(.keyword == "enum") | 
                   . as $error |
                   ($error.instancePath | split("/") | map(select(. != ""))) as $pathParts |
@@ -215,31 +226,39 @@ runs:
                     if ($part | test("^[0-9]+$")) then .[$part | tonumber] else .[$part] end
                   )) as $invalidValue |
                   "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
-                  ' >> validation-errors.md 2>/dev/null || {
+                  ' ajv-errors.json >> validation-errors.md 2>/dev/null || {
                     echo "| General | Enhanced parsing failed | See raw errors below | - |" >> validation-errors.md
                   }
                 else
-                  echo "_No enum validation errors found in JSON output._" >> validation-errors.md
+                  echo "| Field | Issue | Expected | Actual |" >> validation-errors.md
+                  echo "|-------|-------|----------|--------|" >> validation-errors.md
+                  jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> validation-errors.md 2>/dev/null || {
+                    echo "| General | Schema validation failed | See raw errors below | - |" >> validation-errors.md
+                  }
                 fi
                 
-                # Clean up temp file
-                rm -f temp-ajv-errors.json
                 echo "" >> validation-errors.md
               fi
               
-              # Fallback: Add human-readable error details
-              echo "**Raw Validation Output:**" >> validation-errors.md
-              echo '```' >> validation-errors.md
-              ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=text --verbose --strict=false 2>&1 || true >> validation-errors.md
+              # Raw JSON errors for reference
+              echo "### Raw validation errors:" >> validation-errors.md
+              echo "" >> validation-errors.md
+              echo '```json' >> validation-errors.md
+              cat ajv-errors.json >> validation-errors.md
               echo '```' >> validation-errors.md
               echo "" >> validation-errors.md
             fi
+            
+            # Clean up temporary file
+            rm -f temp-ajv-output.txt
           else
-            echo "⚠️  categories-schema.json not found at ${{ github.action_path }}/categories-config/, skipping validation"
+            echo "❌ Schema file not found: ${{ github.action_path }}/categories-config/categories-schema.json"
+            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           fi
         else
           echo "⚠️  Categories file ${{ inputs.categories-file }} not found, skipping validation"
-          echo "[]" > ajv-errors.json  # Empty array when file doesn't exist
+          # Create empty JSON array when file doesn't exist for consistent processing downstream
+          echo "[]" > ajv-errors.json
         fi
         
         # Store JSON error count
@@ -430,23 +449,6 @@ runs:
           else
             echo "- **Result:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Issue Breakdown" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Severity | Count | Description |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔴 Errors | $error_count | Must be fixed |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🟡 Warnings | $warning_count | Should be reviewed |" >> $GITHUB_STEP_SUMMARY
-          echo "| 🔵 Info | $info_count | Informational |" >> $GITHUB_STEP_SUMMARY
-          echo "| 💡 Hints | $hint_count | Suggestions |" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f spectral-report.md ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 📋 Detailed Analysis" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            tail -n +4 spectral-report.md >> $GITHUB_STEP_SUMMARY
-          fi
         else
           echo "- **Result:** ✅ Validation passed" >> $GITHUB_STEP_SUMMARY
         fi
@@ -464,24 +466,23 @@ runs:
             echo "- **Result:** ✅ Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
             
             # Show validated items count
-            if [ -f "${{ inputs.categories-file }}" ]; then
-              item_count=$(jq 'length' "${{ inputs.categories-file }}" 2>/dev/null || echo "0")
-              echo "- **Items validated:** $item_count categories" >> $GITHUB_STEP_SUMMARY
-            fi
+            item_count=$(jq 'length' "${{ inputs.categories-file }}" 2>/dev/null || echo "0")
+            echo "- **Items validated:** $item_count categories" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Result:** ❌ Found $JSON_ERRORS schema validation error(s)" >> $GITHUB_STEP_SUMMARY
             
             # Parse and display JSON validation errors
             if [ -f ajv-errors.json ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### 🚨 Validation Errors" >> $GITHUB_STEP_SUMMARY
+              echo "### 🚨 Category Validation Errors" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               
               # Check if we have JSON errors to parse
               error_count=$(jq 'length' ajv-errors.json 2>/dev/null || echo "0")
               if [ "$error_count" -gt 0 ]; then
-                # Enhanced error reporting with tagKey context
-                if command -v jq >/dev/null 2>&1; then
+                # Check for enum errors specifically
+                if jq -e '.[] | select(.keyword == "enum")' ajv-errors.json >/dev/null 2>&1; then
+                  # Enhanced error reporting with tagKey context
                   echo "| TagKey | Invalid Value | Allowed Values |" >> $GITHUB_STEP_SUMMARY
                   echo "|--------|---------------|----------------|" >> $GITHUB_STEP_SUMMARY
                   
@@ -498,104 +499,55 @@ runs:
                   )) as $invalidValue |
                   "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
                   ' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
-                    # Fallback to basic error reporting
+                    # If enhanced error reporting fails, fall back to a simpler format
                     echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
                     echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
                     jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
-                      echo "| General | Schema validation failed | See error details below | - |" >> $GITHUB_STEP_SUMMARY
+                      # If all JSON parsing fails, add a generic error message
+                      echo "| General | Schema validation failed | See validation-errors.md for details | - |" >> $GITHUB_STEP_SUMMARY
                     }
                   }
                 else
-                  # Fallback when jq is not available
+                  # For non-enum errors, show generic format
                   echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
                   echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-                  echo "| General | Schema validation failed | See error details below | - |" >> $GITHUB_STEP_SUMMARY
+                  jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
+                    echo "| General | Schema validation failed | See validation-errors.md for details | - |" >> $GITHUB_STEP_SUMMARY
+                  }
                 fi
-                
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "### 📋 Error Details" >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo '```json' >> $GITHUB_STEP_SUMMARY
-                jq '.' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Error parsing validation results" >> $GITHUB_STEP_SUMMARY
-                echo '```' >> $GITHUB_STEP_SUMMARY
               else
-                echo "- Validation failed but no detailed errors available" >> $GITHUB_STEP_SUMMARY
+                echo "⚠️ Validation failed but no detailed errors available" >> $GITHUB_STEP_SUMMARY
               fi
+            else
+              echo "⚠️ Error details not available (ajv-errors.json not found)" >> $GITHUB_STEP_SUMMARY
             fi
           fi
         else
-          echo "- **Result:** ⚠️ Categories file not found" >> $GITHUB_STEP_SUMMARY
-          echo "- **Expected location:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ Categories file not found, validation skipped" >> $GITHUB_STEP_SUMMARY
         fi
+        
         echo "" >> $GITHUB_STEP_SUMMARY
         
         # Error details section (only if there are errors)
-        if [ "$VALIDATION_FAILED" = "true" ] && [ -f validation-errors.md ]; then
-          echo "## 🚨 Error Details" >> $GITHUB_STEP_SUMMARY
+        if [ "$VALIDATION_FAILED" = "true" ]; then
+          echo "## 🚨 Validation Errors Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          cat validation-errors.md >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f validation-errors.md ]; then
+            cat validation-errors.md >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
         fi
         
         # Generated artifacts section
         echo "## 📄 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "The following validation reports have been generated:" >> $GITHUB_STEP_SUMMARY
+        echo "The following artifacts were generated during validation:" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **validation-errors.md** - Detailed error log" >> $GITHUB_STEP_SUMMARY
+        echo "- **spectral-report.md** - Detailed OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
+        echo "- **spectral-report.json** - Machine-readable OpenAPI validation data" >> $GITHUB_STEP_SUMMARY
         
-        artifacts_found=false
-        if [ -f spectral-report.json ]; then
-          echo "- \`spectral-report.json\` - Machine-readable OpenAPI validation results" >> $GITHUB_STEP_SUMMARY
-          artifacts_found=true
-        fi
-        if [ -f spectral-report.md ]; then
-          echo "- \`spectral-report.md\` - Human-readable OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
-          artifacts_found=true
-        fi
-        if [ -f "${{ github.action_path }}/documentation-config/.markdownlint.json" ]; then
-          echo "- \`${{ github.action_path }}/documentation-config/.markdownlint.json\` - Markdownlint configuration used" >> $GITHUB_STEP_SUMMARY
-          artifacts_found=true
-        fi
-        if [ -f "${{ github.action_path }}/api-spec-config/.spectral.yaml" ]; then
-          echo "- \`${{ github.action_path }}/api-spec-config/.spectral.yaml\` - Spectral configuration used" >> $GITHUB_STEP_SUMMARY
-          artifacts_found=true
-        fi
-        if [ -f validation-errors.md ]; then
-          echo "- \`validation-errors.md\` - Detailed error log" >> $GITHUB_STEP_SUMMARY
-          artifacts_found=true
-        fi
-        
-        if [ "$artifacts_found" = false ]; then
-          echo "- No artifacts generated (all validations passed)" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Next steps section (only if there are failures)
-        if [ "$VALIDATION_FAILED" = "true" ]; then
-          echo "## 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To resolve the identified issues:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "1. **Review the error details above** for specific issues" >> $GITHUB_STEP_SUMMARY
-          echo "2. **Download artifacts** for complete error logs and reports" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "$MARKDOWN_ERRORS" -gt 0 ]; then
-            echo "3. **Fix markdown issues** in \`${{ inputs.documentation-directory }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ "$OPENAPI_ERRORS" -gt 0 ]; then
-            echo "4. **Fix OpenAPI issues** in \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ "$JSON_ERRORS" -gt 0 ]; then
-            echo "5. **Fix categories schema issues** in \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "6. **Re-run the validation** to verify fixes" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "*Report generated by Documentation and API Validation Action*" >> $GITHUB_STEP_SUMMARY
-
     - name: Final validation check
       shell: bash
       run: |
@@ -612,9 +564,6 @@ runs:
         echo "🔍 Performing final validation check..."
         echo ""
         echo "📊 Final Summary:"
-        echo "  - Documentation directory: ${{ inputs.documentation-directory }}"
-        echo "  - OpenAPI file: ${{ inputs.openapi-file }}"
-        echo "  - Markdown files linted: $(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)"
         echo "  - Markdown errors: $MARKDOWN_ERRORS"
         echo "  - OpenAPI errors: $OPENAPI_ERRORS"
         echo "  - JSON errors: $JSON_ERRORS"
