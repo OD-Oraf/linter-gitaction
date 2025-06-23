@@ -146,7 +146,7 @@ runs:
               echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
               json_errors=$((json_errors + 1))
               
-              # Extract error details from JSON output
+              # Generate enhanced error report with tagKey and invalid values
               echo "## ❌ JSON Schema Validation Errors" >> validation-errors.md
               echo "" >> validation-errors.md
               echo "### Categories file validation failed:" >> validation-errors.md
@@ -154,8 +154,38 @@ runs:
               echo "**Schema:** \`categories-schema.json\`" >> validation-errors.md
               echo "" >> validation-errors.md
               
-              # Add human-readable error details
-              echo "**Validation Errors:**" >> validation-errors.md
+              # Enhanced error reporting with tagKey context
+              if command -v jq >/dev/null 2>&1; then
+                echo "**Detailed Validation Errors:**" >> validation-errors.md
+                echo "" >> validation-errors.md
+                
+                # Use jq to parse and format errors with tagKey context
+                ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=json --strict=false 2>&1 | tail -n +2 | jq -r --slurpfile data "${{ inputs.categories-file }}" '
+                .[] | select(.keyword == "enum") | 
+                . as $error |
+                ($error.instancePath | split("/") | map(select(. != ""))) as $pathParts |
+                ($pathParts[0] | tonumber) as $index |
+                $data[0][$index].tagKey as $tagKey |
+                ($pathParts | reduce .[] as $part (
+                  $data[0]; 
+                  if ($part | test("^[0-9]+$")) then .[$part | tonumber] else .[$part] end
+                )) as $invalidValue |
+                "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
+                ' 2>/dev/null | {
+                  if [ -s /dev/stdin ]; then
+                    echo "| TagKey | Invalid Value | Allowed Values |"
+                    echo "|--------|---------------|----------------|"
+                    cat
+                  else
+                    echo "_No enum validation errors found._"
+                  fi
+                } >> validation-errors.md
+                
+                echo "" >> validation-errors.md
+              fi
+              
+              # Fallback: Add human-readable error details
+              echo "**Raw Validation Output:**" >> validation-errors.md
               echo '```' >> validation-errors.md
               ajv validate -s "${{ github.action_path }}/categories-config/categories-schema.json" -d "${{ inputs.categories-file }}" --errors=text --verbose --strict=false 2>&1 || true >> validation-errors.md
               echo '```' >> validation-errors.md
@@ -384,13 +414,37 @@ runs:
               # Check if we have JSON errors to parse
               error_count=$(jq 'length' ajv-errors.json 2>/dev/null || echo "0")
               if [ "$error_count" -gt 0 ]; then
-                echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
-                echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-                
-                # Parse JSON errors and create table rows
-                jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
+                # Enhanced error reporting with tagKey context
+                if command -v jq >/dev/null 2>&1; then
+                  echo "| TagKey | Invalid Value | Allowed Values |" >> $GITHUB_STEP_SUMMARY
+                  echo "|--------|---------------|----------------|" >> $GITHUB_STEP_SUMMARY
+                  
+                  # Use jq to parse and format errors with tagKey context
+                  jq -r --slurpfile data "${{ inputs.categories-file }}" '
+                  .[] | select(.keyword == "enum") | 
+                  . as $error |
+                  ($error.instancePath | split("/") | map(select(. != ""))) as $pathParts |
+                  ($pathParts[0] | tonumber) as $index |
+                  $data[0][$index].tagKey as $tagKey |
+                  ($pathParts | reduce .[] as $part (
+                    $data[0]; 
+                    if ($part | test("^[0-9]+$")) then .[$part | tonumber] else .[$part] end
+                  )) as $invalidValue |
+                  "| **\($tagKey)** | `\"\($invalidValue)\"` | \($error.params.allowedValues | map("\"" + . + "\"") | join(", ")) |"
+                  ' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
+                    # Fallback to basic error reporting
+                    echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
+                    echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+                    jq -r '.[] | "| `" + (.instancePath // "/") + "` | " + .message + " | " + (if .params.allowedValues then (.params.allowedValues | join(", ")) else "N/A" end) + " | `" + (.data | tostring) + "` |"' ajv-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || {
+                      echo "| General | Schema validation failed | See error details below | - |" >> $GITHUB_STEP_SUMMARY
+                    }
+                  }
+                else
+                  # Fallback when jq is not available
+                  echo "| Field | Issue | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
+                  echo "|-------|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
                   echo "| General | Schema validation failed | See error details below | - |" >> $GITHUB_STEP_SUMMARY
-                }
+                fi
                 
                 echo "" >> $GITHUB_STEP_SUMMARY
                 echo "### 📋 Error Details" >> $GITHUB_STEP_SUMMARY

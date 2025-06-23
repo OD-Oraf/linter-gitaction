@@ -9,31 +9,68 @@
   "items": {
     "type": "object",
     "required": ["tagKey", "value"],
-    "additionalProperties": false,
-    "properties": {
-      "tagKey": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The key identifier for the tag",
-        "examples": ["environment", "team", "project"]
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "properties": {
+          "tagKey": {
+            "const": "Owning Business Group"
+          },
+          "value": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Global",
+                "Service",
+                "Customer Experience",
+                "Engineering",
+                "Product",
+                "Marketing",
+                "Sales",
+                "Operations",
+                "Finance",
+                "Human Resources"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Array of business groups responsible for this resource"
+          }
+        }
       },
-      "value": {
-        "type": "string",
-        "minLength": 1,
-        "description": "The value associated with the tag key",
-        "examples": ["production", "development", "backend-team"]
+      {
+        "additionalProperties": false,
+        "properties": {
+          "tagKey": {
+            "const": "Data Classification"
+          },
+          "value": {
+            "type": "string",
+            "enum": [
+              "DCL1",
+              "DCL2", 
+              "DCL3",
+              "DCL4"
+            ],
+            "description": "Data classification level (DCL1=Public, DCL2=Internal, DCL3=Confidential, DCL4=Restricted)"
+          }
+        }
       }
-    }
+    ]
   },
   "examples": [
     [
       {
-        "tagKey": "environment",
-        "value": "production"
+        "tagKey": "Owning Business Group",
+        "value": [
+          "Global",
+          "Service"
+        ]
       },
       {
-        "tagKey": "team",
-        "value": "backend"
+        "tagKey": "Data Classification",
+        "value": "DCL4"
       }
     ]
   ]
