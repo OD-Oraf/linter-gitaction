@@ -87,25 +87,6 @@ runs:
         echo "📁 Documentation directory: ${{ inputs.documentation-directory }}"
         echo "📄 OpenAPI file: ${{ inputs.openapi-file }}"
 
-    - name: Create markdownlint config
-      shell: bash
-      run: |
-        cat > .markdownlint.json << 'EOF'
-        {
-          "default": true,
-          "MD013": {
-            "line_length": 120,
-            "code_blocks": false,
-            "tables": false
-          },
-          "MD033": {
-            "allowed_elements": ["br", "sub", "sup"]
-          },
-          "MD041": false
-        }
-        EOF
-        echo "📝 Created markdownlint configuration"
-
     - name: Lint markdown files
       shell: bash
       run: |
@@ -121,7 +102,7 @@ runs:
         fi
            
         # Run markdownlint and capture output
-        if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config .markdownlint.json > markdownlint-output.txt 2>&1; then
+        if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config "${{ github.action_path }}/.markdownlint.json" > markdownlint-output.txt 2>&1; then
           echo "❌ Markdown linting failed"
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
           
