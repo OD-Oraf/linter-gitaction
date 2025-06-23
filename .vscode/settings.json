@@ -1,0 +1,31 @@
+{
+  "markdownlint.config": {
+    "default": true,
+    "MD013": {
+      "line_length": 120,
+      "code_blocks": false,
+      "tables": false
+    },
+    "MD033": {
+      "allowed_elements": ["br", "sub", "sup"]
+    },
+    "MD041": false
+  },
+  "json.validate.enable": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["categories.json"],
+      "url": "./actions/categories/categories-schema.json"
+    }
+  ],
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.1/schema.json": [
+      "*.openapi.yaml",
+      "*.openapi.yml",
+      "**/openapi/**/*.yaml",
+      "**/openapi/**/*.yml"
+    ]
+  },
+  "spectral.enable": true,
+  "spectral.rulesetFile": "./actions/api-spec/.spectral.yaml"
+}

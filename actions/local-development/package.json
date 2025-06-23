@@ -4,11 +4,11 @@
   "description": "Development dependencies for linting tools",
   "private": true,
   "scripts": {
-    "lint:markdown": "markdownlint documentation/**/*.md --config ../.markdownlint.json",
-    "lint:openapi": "spectral lint --ruleset ../.spectral.yaml",
-    "lint:json": "ajv validate --spec=draft7 --errors=json -s ../../categories-schema.json -d categories.json",
+    "lint:markdown": "markdownlint documentation/**/*.md --config actions/documentation/.markdownlint.json",
+    "lint:openapi": "spectral lint --ruleset actions/api-spec/.spectral.yaml",
+    "lint:json": "ajv validate --spec=draft7 --errors=json -s actions/categories/categories-schema.json -d categories.json",
     "lint:all": "npm run lint:markdown && npm run lint:openapi && npm run lint:json",
-    "fix:markdown": "markdownlint documentation/**/*.md --config ../.markdownlint.json --fix"
+    "fix:markdown": "markdownlint documentation/**/*.md --config actions/documentation/.markdownlint.json --fix"
   },
   "devDependencies": {
     "markdownlint-cli": "^0.37.0",

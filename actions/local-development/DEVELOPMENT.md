@@ -34,8 +34,8 @@ npm run fix:markdown
 
 #### IntelliJ/WebStorm
 - Install plugins: Markdown, YAML/Ansible Support, JSON Schema
-- Configure markdownlint to use `actions/.markdownlint.json`
-- Set JSON schema mapping for `categories.json` → `categories-schema.json`
+- Configure markdownlint to use `actions/documentation/.markdownlint.json`
+- Set JSON schema mapping for `categories.json` → `actions/categories/categories-schema.json`
 
 #### Vim/Neovim
 - Use ALE or similar linting plugin
@@ -43,9 +43,9 @@ npm run fix:markdown
 
 ## Configuration Files
 
-- **Markdown**: `actions/.markdownlint.json`
-- **OpenAPI**: `.spectral.yaml` (if exists)
-- **JSON Schema**: `categories-schema.json`
+- **Markdown**: `actions/documentation/.markdownlint.json`
+- **OpenAPI**: `actions/api-spec/.spectral.yaml`
+- **JSON Schema**: `actions/categories/categories-schema.json`
 
 ## Pre-commit Hooks (Optional)
 

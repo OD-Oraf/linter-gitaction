@@ -1,0 +1,4 @@
+extends: ["spectral:oas"]
+rules:
+  info-contact: false
+  info-description: false
