@@ -627,6 +627,7 @@ runs:
           echo "=================================================="
           echo "🎉 ALL VALIDATIONS PASSED - BUILD SUCCESS"
           echo "=================================================="
+        fi
 
 branding:
   icon: 'check-circle'
