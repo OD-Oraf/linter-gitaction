@@ -513,8 +513,8 @@ runs:
           
           if [ -f validation-errors.md ]; then
             # Extract markdown-specific errors from validation-errors.md
-            if grep -q "## Markdown Linting" validation-errors.md; then
-              sed -n '/## Markdown Linting/,/^## /p' validation-errors.md | sed '$d' >> $GITHUB_STEP_SUMMARY
+            if grep -q "## ❌ Markdown Linting Errors" validation-errors.md; then
+              sed -n '/## ❌ Markdown Linting Errors/,/^## /p' validation-errors.md | sed '$d' >> $GITHUB_STEP_SUMMARY
             else
               echo "❌ Markdown linting failed with $MARKDOWN_ERRORS error(s). Check the validation logs for details." >> $GITHUB_STEP_SUMMARY
             fi
@@ -534,13 +534,12 @@ runs:
         echo "- **Ruleset:** \`.spectral.yaml\`" >> $GITHUB_STEP_SUMMARY
         
         if [ -f spectral-report.json ]; then
-          error_count=$(jq '[.[] | select(.severity == 0)] | length' spectral-report.json 2>/dev/null || echo "0")
           warning_count=$(jq '[.[] | select(.severity == 1)] | length' spectral-report.json 2>/dev/null || echo "0")
           info_count=$(jq '[.[] | select(.severity == 2)] | length' spectral-report.json 2>/dev/null || echo "0")
           hint_count=$(jq '[.[] | select(.severity == 3)] | length' spectral-report.json 2>/dev/null || echo "0")
           
-          if [ "$error_count" -gt 0 ]; then
-            echo "- **Result:** ❌ Found $error_count error(s), $warning_count warning(s)" >> $GITHUB_STEP_SUMMARY
+          if [ "$OPENAPI_ERRORS" -gt 0 ]; then
+            echo "- **Result:** ❌ Found $OPENAPI_ERRORS error(s), $warning_count warning(s)" >> $GITHUB_STEP_SUMMARY
             
             # Show OpenAPI errors in this section
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -568,7 +567,6 @@ runs:
             
             # Extract warnings and info
             jq -r '.[] | select(.severity >= 1 and .severity <= 2) | "| \(if .severity == 1 then "⚠️ Warning" else "ℹ️ Info" end) | `\(.code)` | `\(.path // "N/A")` | \(.message) |"' spectral-report.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
-            
           else
             echo "- **Result:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
           fi
