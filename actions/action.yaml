@@ -32,63 +32,64 @@ runs:
     - name: Install CLI tools
       shell: bash
       run: |
-        echo "=================================================="
-        echo "🔧 INSTALLING CLI TOOLS"
-        echo "=================================================="
-        npm install -g markdownlint-cli
-        npm install -g @stoplight/spectral-cli
+        echo "=============================================="
+        echo "INSTALLING CLI TOOLS"
+        echo "=============================================="
+        echo "Installing markdownlint-cli and spectral..."
+        npm install -g markdownlint-cli @stoplight/spectral-cli
         echo "✅ Node.js tools installed"
+        echo ""
         
     - name: Setup Python environment for validation
       shell: bash
       run: |
-        echo "=================================================="
-        echo "🐍 SETTING UP PYTHON ENVIRONMENT"
-        echo "=================================================="
-        echo "🔍 Python version: $(python3 --version)"
-        echo "🔍 Pip version: $(pip3 --version)"
+        echo "=============================================="
+        echo "SETTING UP PYTHON ENVIRONMENT"
+        echo "=============================================="
+        echo "Python version: $(python3 --version)"
+        echo "Pip version: $(pip3 --version)"
         
         # Setup Python environment in the action directory
         cd "${{ github.action_path }}/categories-config"
         
         # Create virtual environment if it doesn't exist
         if [ ! -d ".venv" ]; then
-          echo "🐍 Creating Python virtual environment..."
+          echo "Creating Python virtual environment..."
           python3 -m venv .venv
         else
-          echo "🐍 Using existing virtual environment..."
+          echo "Using existing virtual environment..."
         fi
         
         # Activate virtual environment and install dependencies
         source .venv/bin/activate
-        echo "🔍 Virtual environment Python: $(which python3)"
+        echo "Virtual environment Python: $(which python3)"
         
         # Install/upgrade pip
         python3 -m pip install --upgrade pip
         
         # Install dependencies
         if [ -f "requirements.txt" ]; then
-          echo "📦 Installing Python dependencies from requirements.txt..."
+          echo "Installing Python dependencies from requirements.txt..."
           pip install -r requirements.txt
           echo "✅ Python dependencies installed"
         else
-          echo "📦 Installing jsonschema directly..."
+          echo "Installing jsonschema directly..."
           pip install jsonschema==4.21.1
           echo "✅ jsonschema installed"
         fi
         
         # Verify installation
-        echo "🔍 Installed packages:"
-        pip list | grep jsonschema || echo "❌ jsonschema not found"
+        echo "Installed packages:"
+        pip list | grep jsonschema || echo "jsonschema not found"
         
         echo "✅ Python environment setup complete"
         
     - name: Initialize validation state
       shell: bash
       run: |
-        echo "=================================================="
-        echo "🚀 INITIALIZING VALIDATION STATE"
-        echo "=================================================="
+        echo "=============================================="
+        echo "INITIALIZING VALIDATION STATE"
+        echo "=============================================="
         echo "VALIDATION_FAILED=false" >> $GITHUB_ENV
         echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
         echo "OPENAPI_ERRORS=0" >> $GITHUB_ENV
@@ -96,21 +97,21 @@ runs:
         echo "# Validation Error Log" > validation-errors.md
         echo "" >> validation-errors.md
         echo "✅ Validation state initialized"
-        echo "=================================================="
+        echo "=============================================="
         
     - name: Validate inputs
       shell: bash
       run: |
-        echo "=================================================="
-        echo "🔍 VALIDATING INPUT PARAMETERS"
-        echo "=================================================="
-        echo "📁 Documentation directory: ${{ inputs.documentation-directory }}"
-        echo "📄 OpenAPI file: ${{ inputs.openapi-file }}"
-        echo "📋 Categories file: ${{ inputs.categories-file }}"
+        echo "=============================================="
+        echo "VALIDATING INPUT PARAMETERS"
+        echo "=============================================="
+        echo "Documentation directory: ${{ inputs.documentation-directory }}"
+        echo "OpenAPI file: ${{ inputs.openapi-file }}"
+        echo "Categories file: ${{ inputs.categories-file }}"
         echo ""
         if [ ! -d "${{ inputs.documentation-directory }}" ]; then
-          echo "❌ Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
-          echo "## ❌ Input Validation Errors" >> validation-errors.md
+          echo "Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
+          echo "## Input Validation Errors" >> validation-errors.md
           echo "- Documentation directory '${{ inputs.documentation-directory }}' does not exist" >> validation-errors.md
           echo "" >> validation-errors.md
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
@@ -118,46 +119,46 @@ runs:
         
         if [ ! -f "${{ inputs.openapi-file }}" ]; then
           echo "Error: OpenAPI file '${{ inputs.openapi-file }}' does not exist"
-          echo "## ❌ Input Validation Errors" >> validation-errors.md
+          echo "## Input Validation Errors" >> validation-errors.md
           echo "- OpenAPI file '${{ inputs.openapi-file }}' does not exist" >> validation-errors.md
           echo "" >> validation-errors.md
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
         fi
         
-        echo "🔍 Validating OpenAPI file format: ${{ inputs.openapi-file }}"
+        echo "Validating OpenAPI file format: ${{ inputs.openapi-file }}"
         
         # Check if file has .yaml or .yml extension
         if [[ "${{ inputs.openapi-file }}" =~ \.(yaml|yml)$ ]]; then
-          echo "✅ OpenAPI file has valid YAML extension"
+          echo "OpenAPI file has valid YAML extension"
         elif [[ "${{ inputs.openapi-file }}" =~ \.json$ ]]; then
-          echo "✅ OpenAPI file has valid JSON extension"
+          echo "OpenAPI file has valid JSON extension"
         else
-          echo "⚠️  OpenAPI file extension is not .yaml, .yml, or .json"
+          echo "OpenAPI file extension is not .yaml, .yml, or .json"
         fi
         
         # Basic file validation
         if [ -s "${{ inputs.openapi-file }}" ]; then
-          echo "✅ OpenAPI file is not empty"
+          echo "OpenAPI file is not empty"
         else
-          echo "❌ OpenAPI file is empty"
+          echo "OpenAPI file is empty"
           echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          echo "## ❌ OpenAPI File Validation Errors" >> validation-errors.md
+          echo "## OpenAPI File Validation Errors" >> validation-errors.md
           echo "- OpenAPI file is empty" >> validation-errors.md
           echo "" >> validation-errors.md
         fi
         
-        echo "✅ Input validation passed"
-        echo "📁 Documentation directory: ${{ inputs.documentation-directory }}"
-        echo "📄 OpenAPI file: ${{ inputs.openapi-file }}"
+        echo "Input validation passed"
+        echo "Documentation directory: ${{ inputs.documentation-directory }}"
+        echo "OpenAPI file: ${{ inputs.openapi-file }}"
 
     - name: Lint markdown files
       shell: bash
       run: |
-        echo "=================================================="
-        echo "📝 LINTING MARKDOWN FILES"
-        echo "=================================================="
-        echo "🔍 Scanning directory: ${{ inputs.documentation-directory }}"
-        echo "📋 Using config: ${{ github.action_path }}/documentation-config/.markdownlint.json"
+        echo "=============================================="
+        echo "LINTING MARKDOWN FILES"
+        echo "=============================================="
+        echo "Scanning directory: ${{ inputs.documentation-directory }}"
+        echo "Using config: ${{ github.action_path }}/documentation-config/.markdownlint.json"
         echo ""
         
         # Initialize markdown validation state
@@ -168,7 +169,7 @@ runs:
         echo "Found $md_count markdown file(s) to lint"
         
         if [ $md_count -eq 0 ]; then
-          echo "⚠️  No markdown files found in ${{ inputs.documentation-directory }}"
+          echo "No markdown files found in ${{ inputs.documentation-directory }}"
           exit 0
         fi
            
@@ -177,7 +178,7 @@ runs:
         find "${{ inputs.documentation-directory }}" -name "*.md" -type f > md_files.txt
         
         # Write markdown section header to step summary
-        echo "## 📝 Markdown Linting" >> $GITHUB_STEP_SUMMARY
+        echo "## Markdown Linting" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **Directory:** \`${{ inputs.documentation-directory }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Tool:** markdownlint-cli" >> $GITHUB_STEP_SUMMARY
@@ -185,18 +186,18 @@ runs:
         if [ -s md_files.txt ]; then
           file_count=$(wc -l < md_files.txt)
           echo "- **Files found:** $file_count markdown files" >> $GITHUB_STEP_SUMMARY
-          echo "🔍 Running markdownlint on $file_count file(s)..."
+          echo "Running markdownlint on $file_count file(s)..."
           
           # Run markdownlint with explicit error handling to prevent build failure
           markdownlint_exit_code=0
           markdownlint $(cat md_files.txt) --config "${{ github.action_path }}/documentation-config/.markdownlint.json" > markdownlint-output.txt 2>&1 || markdownlint_exit_code=$?
           
           if [ $markdownlint_exit_code -eq 0 ]; then
-            echo "✅ All markdown files passed linting!"
+            echo "All markdown files passed linting!"
             echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
-            echo "- **Result:** ✅ All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
+            echo "- **Result:** All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ Markdown linting found issues (exit code: $markdownlint_exit_code)"
+            echo "Markdown linting found issues (exit code: $markdownlint_exit_code)"
             echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
             
             # Count errors
@@ -204,16 +205,16 @@ runs:
             echo "MARKDOWN_ERRORS=$error_count" >> $GITHUB_ENV
             
             # Write errors directly to step summary
-            echo "- **Result:** ❌ Found $error_count linting issues" >> $GITHUB_STEP_SUMMARY
+            echo "- **Result:** Found $error_count linting issues" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 🔍 Markdown Linting Errors" >> $GITHUB_STEP_SUMMARY
+            echo "### Markdown Linting Errors" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             cat markdownlint-output.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             
             # Also add to validation log for backwards compatibility
-            echo "## ❌ Markdown Linting Errors ($error_count issues)" >> validation-errors.md
+            echo "## Markdown Linting Errors ($error_count issues)" >> validation-errors.md
             echo "" >> validation-errors.md
             echo '```' >> validation-errors.md
             cat markdownlint-output.txt >> validation-errors.md
@@ -221,51 +222,51 @@ runs:
             echo "" >> validation-errors.md
             
             # Display errors in console
-            echo "📋 Markdown linting errors found:"
+            echo "Markdown linting errors found:"
             cat markdownlint-output.txt
           fi
         else
-          echo "⚠️  No markdown files found to lint"
+          echo "No markdown files found to lint"
           echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
           echo "- **Files found:** 0 markdown files" >> $GITHUB_STEP_SUMMARY
-          echo "- **Result:** ⚠️ No markdown files found to lint" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** No markdown files found to lint" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
         
         # Ensure this step continues regardless of markdownlint results
-        echo "📝 Markdown linting step completed - continuing to next validation step"
+        echo "Markdown linting step completed - continuing to next validation step"
         
         echo ""
-        echo "=================================================="
-        echo "✅ MARKDOWN LINTING COMPLETED"
-        echo "=================================================="
+        echo "=============================================="
+        echo "MARKDOWN LINTING COMPLETED"
+        echo "=============================================="
 
     - name: Validate Categories file against schema
       shell: bash
       run: |
-        echo "=================================================="
-        echo "📋 VALIDATING CATEGORIES FILE"
-        echo "=================================================="
-        echo "🔍 Categories file: ${{ inputs.categories-file }}"
-        echo "🔍 Schema file: categories-schema.json"
+        echo "=============================================="
+        echo "VALIDATING CATEGORIES FILE"
+        echo "=============================================="
+        echo "Categories file: ${{ inputs.categories-file }}"
+        echo "Schema file: categories-schema.json"
         echo ""
         
         # Initialize error count
         json_errors=0
         
         if [ -f "${{ inputs.categories-file }}" ]; then
-          echo "📄 Validating ${{ inputs.categories-file }} against schema..."
+          echo "Validating ${{ inputs.categories-file }} against schema..."
           
           # Write categories section header to step summary
-          echo "## 📋 Categories Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **File:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Schema:** \`categories-schema.json\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Tool:** Python JSON Schema Validator" >> $GITHUB_STEP_SUMMARY
           
           if [ -f "${{ github.action_path }}/categories-config/categories-schema.json" ]; then
-            echo "🔍 Running validation with Python validator..."
+            echo "Running validation with Python validator..."
             
             # Use the pre-configured Python environment
             cd "${{ github.action_path }}/categories-config"
@@ -274,18 +275,18 @@ runs:
             source .venv/bin/activate
             
             # Run validation with JSON output
-            echo "🔍 Running categories validation..."
+            echo "Running categories validation..."
             if python3 validate_categories.py "${{ github.workspace }}/${{ inputs.categories-file }}" "${{ github.action_path }}/categories-config/categories-schema.json" --json > validation-result.json 2>&1; then
-              echo "✅ Categories file passed schema validation!"
+              echo "Categories file passed schema validation!"
               json_errors=0
               
               # Write success to step summary
-              echo "- **Result:** ✅ Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
+              echo "- **Result:** Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
               
               # Create empty errors file for consistency
               echo "[]" > categories-errors.json
             else
-              echo "❌ Categories file failed schema validation"
+              echo "Categories file failed schema validation"
               
               # Extract validation results
               if [ -f "validation-result.json" ]; then
@@ -294,12 +295,12 @@ runs:
                 # Count errors from JSON output
                 json_errors=$(jq '.errors | length' categories-errors.json 2>/dev/null || echo "1")
                 
-                echo "📊 Found $json_errors validation error(s)"
+                echo "Found $json_errors validation error(s)"
                 
                 # Write errors directly to step summary
-                echo "- **Result:** ❌ Found $json_errors validation error(s)" >> $GITHUB_STEP_SUMMARY
+                echo "- **Result:** Found $json_errors validation error(s)" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
-                echo "### 🔍 Categories Validation Errors" >> $GITHUB_STEP_SUMMARY
+                echo "### Categories Validation Errors" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
                 
                 # Check if we have structured errors and display them
@@ -317,37 +318,37 @@ runs:
                 
                 # Show human-readable errors in console
                 echo ""
-                echo "🔍 Validation errors:"
-                jq -r '.errors[] | "❌ TagKey: \(.tagKey // "Unknown")\n   Invalid: \(.invalidValues // [.invalidValue] | join(", "))\n   Allowed: \(.allowedValues // ["N/A"] | join(", "))\n"' categories-errors.json 2>/dev/null || {
-                  echo "❌ Error parsing validation results"
+                echo "Validation errors:"
+                jq -r '.errors[] | "TagKey: \(.tagKey // "Unknown")\n   Invalid: \(.invalidValues // [.invalidValue] | join(", "))\n   Allowed: \(.allowedValues // ["N/A"] | join(", "))\n"' categories-errors.json 2>/dev/null || {
+                  echo "Error parsing validation results"
                   cat validation-result.json
                 }
               else
-                echo "❌ Validation failed - no results file generated"
+                echo "Validation failed - no results file generated"
                 json_errors=1
                 echo '{"valid": false, "errors": [{"message": "Validation failed - no results generated"}], "summary": "Validation error"}' > categories-errors.json
                 
                 # Write error to step summary
-                echo "- **Result:** ❌ Validation failed - no results generated" >> $GITHUB_STEP_SUMMARY
+                echo "- **Result:** Validation failed - no results generated" >> $GITHUB_STEP_SUMMARY
               fi
             fi
           else
-            echo "❌ Schema file not found: ${{ github.action_path }}/categories-config/categories-schema.json"
+            echo "Schema file not found: ${{ github.action_path }}/categories-config/categories-schema.json"
             echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
             json_errors=1
-            echo "- **Result:** ❌ Schema file not found" >> $GITHUB_STEP_SUMMARY
+            echo "- **Result:** Schema file not found" >> $GITHUB_STEP_SUMMARY
           fi
         else
-          echo "⚠️  Categories file ${{ inputs.categories-file }} not found, skipping validation"
+          echo "Categories file ${{ inputs.categories-file }} not found, skipping validation"
           # Create empty JSON array when file doesn't exist for consistent processing downstream
           echo '{"valid": true, "errors": [], "summary": "File not found - skipped validation"}' > "${{ github.workspace }}/categories-errors.json"
           json_errors=0
           
           # Write to step summary
-          echo "## 📋 Categories Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **File:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Result:** ⚠️ File not found - skipping validation" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** File not found - skipping validation" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -356,30 +357,30 @@ runs:
         echo "JSON_ERRORS=$json_errors" >> $GITHUB_ENV
         
         if [ $json_errors -eq 0 ]; then
-          echo "✅ Categories file passed schema validation!"
+          echo "Categories file passed schema validation!"
         else
-          echo "❌ Found $json_errors JSON schema validation error(s)"
+          echo "Found $json_errors JSON schema validation error(s)"
         fi
         
         echo ""
-        echo "=================================================="
-        echo "✅ CATEGORIES VALIDATION COMPLETED"
-        echo "=================================================="
+        echo "=============================================="
+        echo "CATEGORIES VALIDATION COMPLETED"
+        echo "=============================================="
 
     - name: Lint OpenAPI specification with Spectral
       shell: bash
       run: |
-        echo "=================================================="
-        echo "🔧 LINTING OPENAPI SPECIFICATION"
-        echo "=================================================="
-        echo "🔍 OpenAPI file: ${{ inputs.openapi-file }}"
-        echo "📋 Spectral ruleset: ${{ github.action_path}}/api-spec-config/.spectral.yaml"
+        echo "=============================================="
+        echo "LINTING OPENAPI SPECIFICATION"
+        echo "=============================================="
+        echo "OpenAPI file: ${{ inputs.openapi-file }}"
+        echo "Spectral ruleset: ${{ github.action_path}}/api-spec-config/.spectral.yaml"
         echo ""
         
-        echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
+        echo "Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
         # Write OpenAPI section header to step summary
-        echo "## 🔍 OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
+        echo "## OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **File:** \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Tool:** Spectral CLI" >> $GITHUB_STEP_SUMMARY
@@ -389,8 +390,8 @@ runs:
         spectral_exit_code=0
         spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path }}/api-spec-config/.spectral.yaml > spectral-output.txt 2>&1 || spectral_exit_code=$?
         
-        echo "📊 Spectral completed with exit code: $spectral_exit_code"
-        echo "📊 Spectral output:"
+        echo "Spectral completed with exit code: $spectral_exit_code"
+        echo "Spectral output:"
         cat spectral-output.txt
         echo ""
         
@@ -402,18 +403,18 @@ runs:
         
         # Write results directly to step summary
         if [ "$spectral_exit_code" -eq 0 ]; then
-          echo "- **Result:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** No issues found" >> $GITHUB_STEP_SUMMARY
         else
           if [ "$error_found" = true ]; then
             echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-            echo "- **Result:** ❌ Validation failed - errors found" >> $GITHUB_STEP_SUMMARY
+            echo "- **Result:** Validation failed - errors found" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- **Result:** ⚠️ Validation completed with warnings only" >> $GITHUB_STEP_SUMMARY
+            echo "- **Result:** Validation completed with warnings only" >> $GITHUB_STEP_SUMMARY
           fi
           
           # Show detailed errors in step summary
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 OpenAPI Validation Output" >> $GITHUB_STEP_SUMMARY
+          echo "### OpenAPI Validation Output" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat spectral-output.txt >> $GITHUB_STEP_SUMMARY
@@ -429,50 +430,50 @@ runs:
           echo "OPENAPI_ERRORS=0" >> $GITHUB_ENV
         fi
         
-        echo "📊 OpenAPI Structure Analysis:"
+        echo "OpenAPI Structure Analysis:"
         echo "  - Errors: $spectral_exit_code"
         
         if [ "$spectral_exit_code" -gt 0 ]; then
-          echo "❌ OpenAPI specification has structural errors that must be fixed"
+          echo "OpenAPI specification has structural errors that must be fixed"
           
           # Add OpenAPI errors to validation log
-          echo "## ❌ OpenAPI Structural Errors ($spectral_exit_code errors)" >> validation-errors.md
+          echo "## OpenAPI Structural Errors ($spectral_exit_code errors)" >> validation-errors.md
           echo "" >> validation-errors.md
           cat spectral-output.txt >> validation-errors.md
           echo "" >> validation-errors.md
         else
-          echo "✅ OpenAPI specification structure is valid"
+          echo "OpenAPI specification structure is valid"
         fi
         
         echo ""
-        echo "=================================================="
-        echo "✅ OPENAPI VALIDATION COMPLETED"
-        echo "=================================================="
+        echo "=============================================="
+        echo "OPENAPI VALIDATION COMPLETED"
+        echo "=============================================="
 
     - name: Generate GitHub Step Summary
       shell: bash
       run: |
-        echo "=================================================="
-        echo "📊 GENERATING GITHUB STEP SUMMARY"
-        echo "=================================================="
-        echo "📝 Creating validation report..."
+        echo "=============================================="
+        echo "GENERATING GITHUB STEP SUMMARY"
+        echo "=============================================="
+        echo "Creating validation report..."
         echo ""
         
-        echo "# 📋 Documentation and API Validation Report" >> $GITHUB_STEP_SUMMARY
+        echo "# Documentation and API Validation Report" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Validation completed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         # Overall status
         if [ "$VALIDATION_FAILED" = "true" ]; then
-          echo "## ❌ Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "## Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
         else
-          echo "## ✅ Overall Status: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "## Overall Status: PASSED" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
         
         # Summary table
-        echo "## 📊 Validation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "| Component | Status | Errors | Details |" >> $GITHUB_STEP_SUMMARY
         echo "|-----------|--------|--------|---------|" >> $GITHUB_STEP_SUMMARY
@@ -480,25 +481,25 @@ runs:
         # Markdown row
         md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
         if [ $md_count -eq 0 ]; then
-          echo "| 📝 Markdown | ⚠️ No files | 0 | $md_count files found |" >> $GITHUB_STEP_SUMMARY
+          echo "| Markdown | No files | 0 | $md_count files found |" >> $GITHUB_STEP_SUMMARY
         elif [ "$MARKDOWN_ERRORS" -gt 0 ]; then
-          echo "| 📝 Markdown | ❌ Failed | $MARKDOWN_ERRORS | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Markdown | Failed | $MARKDOWN_ERRORS | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
         else
-          echo "| 📝 Markdown | ✅ Passed | 0 | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Markdown | Passed | 0 | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
         fi
         
         # OpenAPI row
         if [ "$OPENAPI_ERRORS" -gt 0 ]; then
-          echo "| 🔍 OpenAPI | ❌ Failed | $OPENAPI_ERRORS | Spectral validation |" >> $GITHUB_STEP_SUMMARY
+          echo "| OpenAPI | Failed | $OPENAPI_ERRORS | Spectral validation |" >> $GITHUB_STEP_SUMMARY
         else
-          echo "| 🔍 OpenAPI | ✅ Passed | 0 | Spectral validation |" >> $GITHUB_STEP_SUMMARY
+          echo "| OpenAPI | Passed | 0 | Spectral validation |" >> $GITHUB_STEP_SUMMARY
         fi
         
         # Categories row
         if [ "$JSON_ERRORS" -gt 0 ]; then
-          echo "| 📋 Categories | ❌ Failed | $JSON_ERRORS | Schema validation |" >> $GITHUB_STEP_SUMMARY
+          echo "| Categories | Failed | $JSON_ERRORS | Schema validation |" >> $GITHUB_STEP_SUMMARY
         else
-          echo "| 📋 Categories | ✅ Passed | 0 | Schema validation |" >> $GITHUB_STEP_SUMMARY
+          echo "| Categories | Passed | 0 | Schema validation |" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -506,18 +507,18 @@ runs:
     - name: Final validation check
       shell: bash
       run: |
-        echo "=================================================="
-        echo "🏁 FINAL VALIDATION CHECK"
-        echo "=================================================="
-        echo "🔍 Checking overall validation status..."
-        echo "📊 MARKDOWN_ERRORS: $MARKDOWN_ERRORS"
-        echo "📊 OPENAPI_ERRORS: $OPENAPI_ERRORS" 
-        echo "📊 JSON_ERRORS: $JSON_ERRORS"
+        echo "=============================================="
+        echo "FINAL VALIDATION CHECK"
+        echo "=============================================="
+        echo "Checking overall validation status..."
+        echo "MARKDOWN_ERRORS: $MARKDOWN_ERRORS"
+        echo "OPENAPI_ERRORS: $OPENAPI_ERRORS" 
+        echo "JSON_ERRORS: $JSON_ERRORS"
         echo ""
         
-        echo "🔍 Performing final validation check..."
+        echo "Performing final validation check..."
         echo ""
-        echo "📊 Final Summary:"
+        echo "Final Summary:"
         echo "  - Markdown errors: $MARKDOWN_ERRORS"
         echo "  - OpenAPI errors: $OPENAPI_ERRORS"
         echo "  - JSON errors: $JSON_ERRORS"
@@ -526,33 +527,33 @@ runs:
         total_errors=$((MARKDOWN_ERRORS + OPENAPI_ERRORS + JSON_ERRORS))
         
         if [ $total_errors -gt 0 ]; then
-          echo "❌ Validation FAILED - Found $total_errors total error(s)"
+          echo "Validation FAILED - Found $total_errors total error(s)"
           echo ""
-          echo "📄 Generated reports:"
+          echo "Generated reports:"
           echo "  - spectral-report.json (machine-readable)"
           echo "  - spectral-report.md (human-readable)"
           echo "  - validation-errors.md (error log)"
           echo ""
-          echo "📋 GitHub Step Summary has been updated with detailed results and error information"
+          echo "GitHub Step Summary has been updated with detailed results and error information"
           echo ""
           echo "Please review the errors above and in the step summary, then fix the issues before re-running."
           echo ""
-          echo "=================================================="
-          echo "❌ VALIDATION FAILED - BUILD WILL FAIL"
-          echo "=================================================="
+          echo "=============================================="
+          echo "VALIDATION FAILED - BUILD WILL FAIL"
+          echo "=============================================="
           exit 1
         else
-          echo "✅ All validation checks passed!"
+          echo "All validation checks passed!"
           echo ""
-          echo "📄 Generated reports:"
+          echo "Generated reports:"
           echo "  - spectral-report.json (machine-readable)"
           echo "  - spectral-report.md (human-readable)"
           echo ""
-          echo "📋 GitHub Step Summary has been updated with validation results"
+          echo "GitHub Step Summary has been updated with validation results"
           echo ""
-          echo "=================================================="
-          echo "🎉 ALL VALIDATIONS PASSED - BUILD SUCCESS"
-          echo "=================================================="
+          echo "=============================================="
+          echo "ALL VALIDATIONS PASSED - BUILD SUCCESS"
+          echo "=============================================="
         fi
 
 branding:
