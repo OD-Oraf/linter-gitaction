@@ -173,26 +173,43 @@ runs:
         fi
            
         # Run markdownlint and capture output
-        if ! markdownlint "${{ inputs.documentation-directory }}/**/*.md" --config "${{ github.action_path }}/documentation-config/.markdownlint.json" > markdownlint-output.txt 2>&1; then
-          echo "❌ Markdown linting failed"
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+        # Use find to get files and avoid glob expansion issues
+        find "${{ inputs.documentation-directory }}" -name "*.md" -type f > md_files.txt
+        
+        if [ -s md_files.txt ]; then
+          echo "🔍 Running markdownlint on $(wc -l < md_files.txt) file(s)..."
           
-          # Count errors
-          error_count=$(wc -l < markdownlint-output.txt || echo "0")
-          echo "MARKDOWN_ERRORS=$error_count" >> $GITHUB_ENV
+          # Run markdownlint with file list and capture both exit code and output
+          set +e  # Disable exit on error temporarily
+          markdownlint $(cat md_files.txt) --config "${{ github.action_path }}/documentation-config/.markdownlint.json" > markdownlint-output.txt 2>&1
+          markdownlint_exit_code=$?
+          set -e  # Re-enable exit on error
           
-          # Add errors to validation log
-          echo "## ❌ Markdown Linting Errors ($error_count issues)" >> validation-errors.md
-          echo "" >> validation-errors.md
-          echo '```' >> validation-errors.md
-          cat markdownlint-output.txt >> validation-errors.md
-          echo '```' >> validation-errors.md
-          echo "" >> validation-errors.md
-          
-          # Display errors in console
-          cat markdownlint-output.txt
+          if [ $markdownlint_exit_code -ne 0 ]; then
+            echo "❌ Markdown linting failed with exit code $markdownlint_exit_code"
+            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+            
+            # Count errors
+            error_count=$(wc -l < markdownlint-output.txt || echo "0")
+            echo "MARKDOWN_ERRORS=$error_count" >> $GITHUB_ENV
+            
+            # Add errors to validation log
+            echo "## ❌ Markdown Linting Errors ($error_count issues)" >> validation-errors.md
+            echo "" >> validation-errors.md
+            echo '```' >> validation-errors.md
+            cat markdownlint-output.txt >> validation-errors.md
+            echo '```' >> validation-errors.md
+            echo "" >> validation-errors.md
+            
+            # Display errors in console
+            cat markdownlint-output.txt
+          else
+            echo "✅ All markdown files passed linting!"
+            echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
+          fi
         else
-          echo "✅ All markdown files passed linting!"
+          echo "⚠️  No markdown files found to lint"
+          echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
         fi
         
         echo ""
