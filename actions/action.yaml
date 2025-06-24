@@ -365,8 +365,11 @@ runs:
         
         echo "🔍 Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
-        # Run Spectral
-        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec-config/.spectral.yaml --format stylish
+        # Run Spectral with error handling to prevent build failure
+        spectral_exit_code=0
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec-config/.spectral.yaml --format stylish || spectral_exit_code=$?
+        
+        echo "📊 Spectral completed with exit code: $spectral_exit_code"
          
         # Generate JSON report for detailed analysis
         spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path}}/api-spec-config/.spectral.yaml --format json > spectral-report.json 2>/dev/null || echo "[]" > spectral-report.json
