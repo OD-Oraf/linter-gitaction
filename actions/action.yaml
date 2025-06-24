@@ -49,7 +49,7 @@ runs:
         echo "🔍 Pip version: $(pip3 --version)"
         
         # Setup Python environment in the action directory
-        cd "${{ github.action_path }}/local-development"
+        cd "${{ github.action_path }}/categories-config"
         
         # Create virtual environment if it doesn't exist
         if [ ! -d ".venv" ]; then
@@ -268,7 +268,7 @@ runs:
             echo "🔍 Running validation with Python validator..."
             
             # Use the pre-configured Python environment
-            cd "${{ github.action_path }}/local-development"
+            cd "${{ github.action_path }}/categories-config"
             
             # Activate virtual environment and install dependencies
             source .venv/bin/activate
