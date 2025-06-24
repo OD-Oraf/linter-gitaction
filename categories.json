@@ -1,11 +1,10 @@
 [
   {
     "tagKey" : "Owning Business Group",
-    "value": [
+    "value":[
       "Global",
-      "Service",
-      "customer experience"
-    ]
+      "Service"
+   ]
   },
   {
     "tagKey" : "Data Classification",

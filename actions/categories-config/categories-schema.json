@@ -6,6 +6,29 @@
   "type": "array",
   "minItems": 1,
   "uniqueItems": true,
+  "$defs": {
+    "owningBusinessGroupValues": {
+      "enum": ["Global", "Service", "Customer Experience", "Engineering", "Product", "Marketing", "Sales", "Operations", "Finance", "Human Resources"]
+    },
+    "dataClassificationValues": {
+      "enum": ["DCL1", "DCL2", "DCL3", "DCL4"]
+    },
+    "stringOrArrayValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      ]
+    }
+  },
   "items": {
     "type": "object",
     "required": ["tagKey", "value"],
@@ -17,25 +40,18 @@
             "const": "Owning Business Group"
           },
           "value": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "Global",
-                "Service",
-                "Customer Experience",
-                "Engineering",
-                "Product",
-                "Marketing",
-                "Sales",
-                "Operations",
-                "Finance",
-                "Human Resources"
-              ]
-            },
-            "minItems": 1,
-            "uniqueItems": true,
-            "description": "Array of business groups responsible for this resource"
+            "allOf": [
+              { "$ref": "#/$defs/stringOrArrayValue" },
+              {
+                "anyOf": [
+                  { "$ref": "#/$defs/owningBusinessGroupValues" },
+                  {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/owningBusinessGroupValues" }
+                  }
+                ]
+              }
+            ]
           }
         }
       },
@@ -46,32 +62,21 @@
             "const": "Data Classification"
           },
           "value": {
-            "type": "string",
-            "enum": [
-              "DCL1",
-              "DCL2", 
-              "DCL3",
-              "DCL4"
-            ],
-            "description": "Data classification level (DCL1=Public, DCL2=Internal, DCL3=Confidential, DCL4=Restricted)"
+            "allOf": [
+              { "$ref": "#/$defs/stringOrArrayValue" },
+              {
+                "anyOf": [
+                  { "$ref": "#/$defs/dataClassificationValues" },
+                  {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/dataClassificationValues" }
+                  }
+                ]
+              }
+            ]
           }
         }
       }
     ]
-  },
-  "examples": [
-    [
-      {
-        "tagKey": "Owning Business Group",
-        "value": [
-          "Global",
-          "Service"
-        ]
-      },
-      {
-        "tagKey": "Data Classification",
-        "value": "DCL4"
-      }
-    ]
-  ]
+  }
 }
