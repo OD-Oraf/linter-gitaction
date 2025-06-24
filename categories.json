@@ -3,11 +3,11 @@
     "tagKey" : "Owning Business Group",
     "value":[
       "Global",
-      "Service"
+      "service"
    ]
   },
   {
     "tagKey" : "Data Classification",
-    "value" : "DCL4"
+    "value" : "DCL5"
   }
 ]

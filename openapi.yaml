@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Pet Store API
+  title:
   description: A simple API for managing a list of pets.
   version: 1.0.0
 servers:
