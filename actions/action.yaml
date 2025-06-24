@@ -6,15 +6,15 @@ inputs:
   documentation-directory:
     description: 'Directory containing markdown files to lint'
     required: true
-    default: './documentation'
+    default: ''
   openapi-file:
     description: 'Path to OpenAPI specification file'
     required: true
-    default: './openapi.yaml'
+    default: ''
   categories-file:
     description: 'Path to categories file'
     required: true
-    default: './categories.json'
+    default: ''
 
 runs:
   using: 'composite'
@@ -105,55 +105,108 @@ runs:
         echo "=============================================="
         echo "VALIDATING INPUT PARAMETERS"
         echo "=============================================="
-        echo "Documentation directory: ${{ inputs.documentation-directory }}"
-        echo "OpenAPI file: ${{ inputs.openapi-file }}"
-        echo "Categories file: ${{ inputs.categories-file }}"
+        echo "Documentation directory: '${{ inputs.documentation-directory }}'"
+        echo "OpenAPI file: '${{ inputs.openapi-file }}'"
+        echo "Categories file: '${{ inputs.categories-file }}'"
         echo ""
-        if [ ! -d "${{ inputs.documentation-directory }}" ]; then
-          echo "Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
-          echo "## Input Validation Errors" >> validation-errors.md
-          echo "- Documentation directory '${{ inputs.documentation-directory }}' does not exist" >> validation-errors.md
-          echo "" >> validation-errors.md
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-        fi
         
-        if [ ! -f "${{ inputs.openapi-file }}" ]; then
-          echo "Error: OpenAPI file '${{ inputs.openapi-file }}' does not exist"
-          echo "## Input Validation Errors" >> validation-errors.md
-          echo "- OpenAPI file '${{ inputs.openapi-file }}' does not exist" >> validation-errors.md
-          echo "" >> validation-errors.md
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-        fi
-        
-        echo "Validating OpenAPI file format: ${{ inputs.openapi-file }}"
-        
-        # Check if file has .yaml or .yml extension
-        if [[ "${{ inputs.openapi-file }}" =~ \.(yaml|yml)$ ]]; then
-          echo "OpenAPI file has valid YAML extension"
-        elif [[ "${{ inputs.openapi-file }}" =~ \.json$ ]]; then
-          echo "OpenAPI file has valid JSON extension"
+        # Skip validation if documentation directory is empty
+        if [ -n "${{ inputs.documentation-directory }}" ]; then
+          if [ ! -d "${{ inputs.documentation-directory }}" ]; then
+            echo "Error: Documentation directory '${{ inputs.documentation-directory }}' does not exist"
+            echo "## Input Validation Errors" >> validation-errors.md
+            echo "- Documentation directory '${{ inputs.documentation-directory }}' does not exist" >> validation-errors.md
+            echo "" >> validation-errors.md
+            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+            exit 1
+          fi
         else
-          echo "OpenAPI file extension is not .yaml, .yml, or .json"
+          echo "Documentation directory input is empty - markdown validation will be skipped"
         fi
         
-        # Basic file validation
-        if [ -s "${{ inputs.openapi-file }}" ]; then
-          echo "OpenAPI file is not empty"
+        # Skip validation if OpenAPI file is empty
+        if [ -n "${{ inputs.openapi-file }}" ]; then
+          if [ ! -f "${{ inputs.openapi-file }}" ]; then
+            echo "Error: OpenAPI file '${{ inputs.openapi-file }}' does not exist"
+            echo "## Input Validation Errors" >> validation-errors.md
+            echo "- OpenAPI file '${{ inputs.openapi-file }}' does not exist" >> validation-errors.md
+            echo "" >> validation-errors.md
+            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+            exit 1
+          fi
+          
+          echo "Validating OpenAPI file format: ${{ inputs.openapi-file }}"
+          
+          # Check if file has .yaml or .yml extension
+          if [[ "${{ inputs.openapi-file }}" =~ \.(yaml|yml)$ ]]; then
+            echo "OpenAPI file has valid YAML extension"
+          elif [[ "${{ inputs.openapi-file }}" =~ \.json$ ]]; then
+            echo "OpenAPI file has valid JSON extension"
+          else
+            echo "OpenAPI file extension is not .yaml, .yml, or .json"
+          fi
+          
+          # Basic file validation
+          if [ -s "${{ inputs.openapi-file }}" ]; then
+            echo "OpenAPI file is not empty"
+          else
+            echo "OpenAPI file is empty"
+            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
+            echo "## OpenAPI File Validation Errors" >> validation-errors.md
+            echo "- OpenAPI file is empty" >> validation-errors.md
+            echo "" >> validation-errors.md
+          fi
         else
-          echo "OpenAPI file is empty"
-          echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-          echo "## OpenAPI File Validation Errors" >> validation-errors.md
-          echo "- OpenAPI file is empty" >> validation-errors.md
-          echo "" >> validation-errors.md
+          echo "OpenAPI file input is empty - OpenAPI validation will be skipped"
         fi
         
-        echo "Input validation passed"
-        echo "Documentation directory: ${{ inputs.documentation-directory }}"
-        echo "OpenAPI file: ${{ inputs.openapi-file }}"
+        # Skip validation if categories file is empty
+        if [ -n "${{ inputs.categories-file }}" ]; then
+          if [ ! -f "${{ inputs.categories-file }}" ]; then
+            echo "Categories file '${{ inputs.categories-file }}' not found - categories validation will be skipped"
+          fi
+        else
+          echo "Categories file input is empty - categories validation will be skipped"
+        fi
+        
+        echo "Input validation completed"
+        if [ -n "${{ inputs.documentation-directory }}" ]; then
+          echo "Documentation directory: ${{ inputs.documentation-directory }}"
+        fi
+        if [ -n "${{ inputs.openapi-file }}" ]; then
+          echo "OpenAPI file: ${{ inputs.openapi-file }}"
+        fi
+        if [ -n "${{ inputs.categories-file }}" ]; then
+          echo "Categories file: ${{ inputs.categories-file }}"
+        fi
 
     - name: Lint markdown files
       shell: bash
       run: |
+        # Skip markdown linting if documentation directory is empty
+        if [ -z "${{ inputs.documentation-directory }}" ]; then
+          echo "=============================================="
+          echo "SKIPPING MARKDOWN LINTING"
+          echo "=============================================="
+          echo "Documentation directory input is empty - skipping markdown validation"
+          echo ""
+          
+          # Set default values for downstream steps
+          echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
+          
+          # Write skip message to step summary
+          echo "## Markdown Linting" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Skipped (no directory specified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** Validation skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "=============================================="
+          echo "MARKDOWN LINTING SKIPPED"
+          echo "=============================================="
+          exit 0
+        fi
+        
         echo "=============================================="
         echo "LINTING MARKDOWN FILES"
         echo "=============================================="
@@ -248,46 +301,67 @@ runs:
         echo "=============================================="
         echo "VALIDATING CATEGORIES FILE"
         echo "=============================================="
-        echo "Categories file: ${{ inputs.categories-file }}"
+        echo "Categories file: '${{ inputs.categories-file }}'"
         echo "Schema file: categories-schema.json"
         echo ""
+        
+        # Skip categories validation if categories file input is empty
+        if [ -z "${{ inputs.categories-file }}" ]; then
+          echo "Categories file input is empty - categories validation will be skipped"
+          echo ""
+          
+          # Set default values for downstream steps
+          echo "JSON_ERRORS=0" >> $GITHUB_ENV
+          
+          # Write skip message to step summary
+          echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Skipped (no file specified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** Validation skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "=============================================="
+          echo "CATEGORIES VALIDATION SKIPPED"
+          echo "=============================================="
+          exit 0
+        fi
         
         # Initialize error count
         json_errors=0
         
         if [ -f "${{ inputs.categories-file }}" ]; then
           echo "Validating ${{ inputs.categories-file }} against schema..."
-          
+            
           # Write categories section header to step summary
           echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **File:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Schema:** \`categories-schema.json\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Tool:** Python JSON Schema Validator" >> $GITHUB_STEP_SUMMARY
-          
+            
           if [ -f "${{ github.action_path }}/categories-config/categories-schema.json" ]; then
             echo "Running validation with Python validator..."
-            
+              
             # Use the pre-configured Python environment
             cd "${{ github.action_path }}/categories-config"
-            
+              
             # Activate virtual environment and install dependencies
             source .venv/bin/activate
-            
+              
             # Run validation with JSON output
             echo "Running categories validation..."
             if python3 validate_categories.py "${{ github.workspace }}/${{ inputs.categories-file }}" "${{ github.action_path }}/categories-config/categories-schema.json" --json > validation-result.json 2>&1; then
               echo "Categories file passed schema validation!"
               json_errors=0
-              
+                
               # Write success to step summary
               echo "- **Result:** Categories file passed schema validation" >> $GITHUB_STEP_SUMMARY
-              
+                
               # Create empty errors file for consistency
               echo "[]" > categories-errors.json
             else
               echo "Categories file failed schema validation"
-              
+                
               # Extract validation results
               if [ -f "validation-result.json" ]; then
                 cp validation-result.json categories-errors.json
@@ -307,7 +381,7 @@ runs:
                 if jq -e '.errors[0].tagKey' categories-errors.json >/dev/null 2>&1; then
                   echo "| TagKey | Invalid Values | Allowed Values |" >> $GITHUB_STEP_SUMMARY
                   echo "|--------|----------------|----------------|" >> $GITHUB_STEP_SUMMARY
-                
+            
                   # Process each structured error
                   jq -r '.errors[] | "| **\(.tagKey)** | `\(.invalidValues | join("`, `"))` | \(.allowedValues | join(", ")) |"' categories-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
                 else
@@ -343,7 +417,7 @@ runs:
           # Create empty JSON array when file doesn't exist for consistent processing downstream
           echo '{"valid": true, "errors": [], "summary": "File not found - skipped validation"}' > "${{ github.workspace }}/categories-errors.json"
           json_errors=0
-          
+            
           # Write to step summary
           echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -385,6 +459,28 @@ runs:
         echo "- **File:** \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Tool:** Spectral CLI" >> $GITHUB_STEP_SUMMARY
         echo "- **Ruleset:** \`.spectral.yaml\`" >> $GITHUB_STEP_SUMMARY
+        
+        # Skip OpenAPI validation if OpenAPI file is empty
+        if [ -z "${{ inputs.openapi-file }}" ]; then
+          echo "=============================================="
+          echo "SKIPPING OPENAPI VALIDATION"
+          echo "=============================================="
+          echo "OpenAPI file input is empty - skipping OpenAPI validation"
+          echo ""
+          
+          # Set default values for downstream steps
+          echo "OPENAPI_ERRORS=0" >> $GITHUB_ENV
+          
+          # Write skip message to step summary
+          echo "- **Status:** Skipped (no file specified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** Validation skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "=============================================="
+          echo "OPENAPI VALIDATION SKIPPED"
+          echo "=============================================="
+          exit 0
+        fi
         
         # Run Spectral with error handling to prevent build failure
         spectral_exit_code=0
@@ -479,8 +575,10 @@ runs:
         echo "|-----------|--------|--------|---------|" >> $GITHUB_STEP_SUMMARY
         
         # Markdown row
-        md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f | wc -l)
-        if [ $md_count -eq 0 ]; then
+        md_count=$(find "${{ inputs.documentation-directory }}" -name "*.md" -type f 2>/dev/null | wc -l || echo "0")
+        if [ -z "${{ inputs.documentation-directory }}" ]; then
+          echo "| Markdown | Skipped | 0 | No directory specified |" >> $GITHUB_STEP_SUMMARY
+        elif [ $md_count -eq 0 ]; then
           echo "| Markdown | No files | 0 | $md_count files found |" >> $GITHUB_STEP_SUMMARY
         elif [ "$MARKDOWN_ERRORS" -gt 0 ]; then
           echo "| Markdown | Failed | $MARKDOWN_ERRORS | $md_count files processed |" >> $GITHUB_STEP_SUMMARY
@@ -491,6 +589,8 @@ runs:
         # OpenAPI row
         if [ "$OPENAPI_ERRORS" -gt 0 ]; then
           echo "| OpenAPI | Failed | $OPENAPI_ERRORS | Spectral validation |" >> $GITHUB_STEP_SUMMARY
+        elif [ -z "${{ inputs.openapi-file }}" ]; then
+          echo "| OpenAPI | Skipped | 0 | No file specified |" >> $GITHUB_STEP_SUMMARY
         else
           echo "| OpenAPI | Passed | 0 | Spectral validation |" >> $GITHUB_STEP_SUMMARY
         fi
@@ -498,6 +598,8 @@ runs:
         # Categories row
         if [ "$JSON_ERRORS" -gt 0 ]; then
           echo "| Categories | Failed | $JSON_ERRORS | Schema validation |" >> $GITHUB_STEP_SUMMARY
+        elif [ -z "${{ inputs.categories-file }}" ]; then
+          echo "| Categories | Skipped | 0 | No file specified |" >> $GITHUB_STEP_SUMMARY
         else
           echo "| Categories | Passed | 0 | Schema validation |" >> $GITHUB_STEP_SUMMARY
         fi
