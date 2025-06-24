@@ -24,6 +24,11 @@ runs:
       with:
         node-version: '18'
         
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
     - name: Install CLI tools
       shell: bash
       run: |
@@ -32,10 +37,52 @@ runs:
         echo "=================================================="
         npm install -g markdownlint-cli
         npm install -g @stoplight/spectral-cli
-        npm install -g ajv-cli
-        echo "✅ Installed markdownlint-cli, spectral-cli, and ajv-cli"
+        echo "✅ Node.js tools installed"
+        
+    - name: Setup Python environment for validation
+      shell: bash
+      run: |
         echo "=================================================="
-      
+        echo "🐍 SETTING UP PYTHON ENVIRONMENT"
+        echo "=================================================="
+        echo "🔍 Python version: $(python3 --version)"
+        echo "🔍 Pip version: $(pip3 --version)"
+        
+        # Setup Python environment in the action directory
+        cd "${{ github.action_path }}/local-development"
+        
+        # Create virtual environment if it doesn't exist
+        if [ ! -d ".venv" ]; then
+          echo "🐍 Creating Python virtual environment..."
+          python3 -m venv .venv
+        else
+          echo "🐍 Using existing virtual environment..."
+        fi
+        
+        # Activate virtual environment and install dependencies
+        source .venv/bin/activate
+        echo "🔍 Virtual environment Python: $(which python3)"
+        
+        # Install/upgrade pip
+        python3 -m pip install --upgrade pip
+        
+        # Install dependencies
+        if [ -f "requirements.txt" ]; then
+          echo "📦 Installing Python dependencies from requirements.txt..."
+          pip install -r requirements.txt
+          echo "✅ Python dependencies installed"
+        else
+          echo "📦 Installing jsonschema directly..."
+          pip install jsonschema==4.21.1
+          echo "✅ jsonschema installed"
+        fi
+        
+        # Verify installation
+        echo "🔍 Installed packages:"
+        pip list | grep jsonschema || echo "❌ jsonschema not found"
+        
+        echo "✅ Python environment setup complete"
+        
     - name: Initialize validation state
       shell: bash
       run: |
@@ -172,22 +219,9 @@ runs:
           if [ -f "${{ github.action_path }}/categories-config/categories-schema.json" ]; then
             echo "🔍 Running validation with Python validator..."
             
-            # Setup Python environment
+            # Use the pre-configured Python environment
             cd "${{ github.action_path }}/local-development"
-            
-            # Install dependencies if not already installed
-            if [ ! -d ".venv" ]; then
-              echo "🐍 Setting up Python virtual environment..."
-              python3 -m venv .venv
-            fi
-            
             source .venv/bin/activate
-            
-            # Install requirements
-            if [ -f "requirements.txt" ]; then
-              echo "📦 Installing Python dependencies..."
-              pip install -q -r requirements.txt
-            fi
             
             # Run validation with JSON output
             echo "🔍 Running categories validation..."
