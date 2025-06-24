@@ -179,14 +179,14 @@ runs:
         if [ -s md_files.txt ]; then
           echo "🔍 Running markdownlint on $(wc -l < md_files.txt) file(s)..."
           
-          # Run markdownlint with file list and capture both exit code and output
-          set +e  # Disable exit on error temporarily
-          markdownlint $(cat md_files.txt) --config "${{ github.action_path }}/documentation-config/.markdownlint.json" > markdownlint-output.txt 2>&1
-          markdownlint_exit_code=$?
-          set -e  # Re-enable exit on error
-          
-          if [ $markdownlint_exit_code -ne 0 ]; then
-            echo "❌ Markdown linting failed with exit code $markdownlint_exit_code"
+          # Run markdownlint with explicit error handling to prevent build failure
+          markdownlint_exit_code=0
+          if markdownlint $(cat md_files.txt) --config "${{ github.action_path }}/documentation-config/.markdownlint.json" > markdownlint-output.txt 2>&1; then
+            echo "✅ All markdown files passed linting!"
+            echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
+          else
+            markdownlint_exit_code=$?
+            echo "❌ Markdown linting found issues (exit code: $markdownlint_exit_code)"
             echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
             
             # Count errors
@@ -202,15 +202,17 @@ runs:
             echo "" >> validation-errors.md
             
             # Display errors in console
+            echo "📋 Markdown linting errors found:"
             cat markdownlint-output.txt
-          else
-            echo "✅ All markdown files passed linting!"
-            echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
           fi
         else
           echo "⚠️  No markdown files found to lint"
           echo "MARKDOWN_ERRORS=0" >> $GITHUB_ENV
         fi
+        
+        # Ensure this step always succeeds to continue with other validations
+        echo "📝 Markdown linting step completed (exit code will be handled in final validation)"
+        exit 0
         
         echo ""
         echo "=================================================="
