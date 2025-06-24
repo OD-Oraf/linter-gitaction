@@ -483,6 +483,22 @@ runs:
           echo "- **Result:** ⚠️ No markdown files found to lint" >> $GITHUB_STEP_SUMMARY
         elif [ "$MARKDOWN_ERRORS" -gt 0 ]; then
           echo "- **Result:** ❌ Found $MARKDOWN_ERRORS linting issues" >> $GITHUB_STEP_SUMMARY
+          
+          # Show markdown errors in this section
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Markdown Linting Errors" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f validation-errors.md ]; then
+            # Extract markdown-specific errors from validation-errors.md
+            if grep -q "## Markdown Linting" validation-errors.md; then
+              sed -n '/## Markdown Linting/,/^## /p' validation-errors.md | sed '$d' >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Markdown linting failed with $MARKDOWN_ERRORS error(s). Check the validation logs for details." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "❌ Markdown linting failed with $MARKDOWN_ERRORS error(s). Check the validation logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
         else
           echo "- **Result:** ✅ All markdown files passed linting" >> $GITHUB_STEP_SUMMARY
         fi
@@ -503,8 +519,34 @@ runs:
           
           if [ "$error_count" -gt 0 ]; then
             echo "- **Result:** ❌ Found $error_count error(s), $warning_count warning(s)" >> $GITHUB_STEP_SUMMARY
+            
+            # Show OpenAPI errors in this section
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔍 OpenAPI Validation Errors" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Show errors table
+            echo "| Severity | Rule | Path | Message |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|------|------|---------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Extract errors (severity 0) and warnings (severity 1)
+            jq -r '.[] | select(.severity <= 1) | "| \(if .severity == 0 then "❌ Error" else "⚠️ Warning" end) | `\(.code)` | `\(.path // "N/A")` | \(.message) |"' spectral-report.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
+            
           elif [ "$warning_count" -gt 0 ]; then
             echo "- **Result:** ⚠️ Found $warning_count warning(s), $info_count info(s)" >> $GITHUB_STEP_SUMMARY
+            
+            # Show OpenAPI warnings in this section
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔍 OpenAPI Validation Warnings" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Show warnings table
+            echo "| Severity | Rule | Path | Message |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|------|------|---------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Extract warnings and info
+            jq -r '.[] | select(.severity >= 1 and .severity <= 2) | "| \(if .severity == 1 then "⚠️ Warning" else "ℹ️ Info" end) | `\(.code)` | `\(.path // "N/A")` | \(.message) |"' spectral-report.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
+            
           else
             echo "- **Result:** ✅ No issues found" >> $GITHUB_STEP_SUMMARY
           fi
@@ -529,26 +571,38 @@ runs:
             echo "- **Items validated:** $item_count categories" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Result:** ❌ Found $JSON_ERRORS schema validation error(s)" >> $GITHUB_STEP_SUMMARY
-            echo "- **Details:** See validation errors section below for detailed breakdown" >> $GITHUB_STEP_SUMMARY
+            
+            # Show categories errors in this section
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔍 Categories Validation Errors" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             
             # Add structured error summary if available
             if [ -f "categories-errors.json" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### 🔍 Validation Error Summary" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              
               # Check if we have structured errors with tagKey
               if jq -e '.errors[0].tagKey' categories-errors.json >/dev/null 2>&1; then
                 echo "| TagKey | Invalid Values | Allowed Values |" >> $GITHUB_STEP_SUMMARY
                 echo "|--------|----------------|----------------|" >> $GITHUB_STEP_SUMMARY
                 
                 # Process each structured error for summary
-                jq -r '.errors[] | "| **\(.tagKey)** | \(.invalidValues | join(", ")) | \(.allowedValues | join(", ")) |"' categories-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
+                jq -r '.errors[] | "| **\(.tagKey)** | `\(.invalidValues | join("`, `"))` | \(.allowedValues | join(", ")) |"' categories-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
               else
                 echo "| Issue | Details |" >> $GITHUB_STEP_SUMMARY
                 echo "|-------|---------|" >> $GITHUB_STEP_SUMMARY
                 jq -r '.errors[] | "| \(.message // "Validation error") | \(.path // "N/A") |"' categories-errors.json >> $GITHUB_STEP_SUMMARY 2>/dev/null
               fi
+              
+              # Show raw JSON for debugging if needed
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "<details>" >> $GITHUB_STEP_SUMMARY
+              echo "<summary>🔍 Raw Validation Output (click to expand)</summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo '```json' >> $GITHUB_STEP_SUMMARY
+              cat categories-errors.json >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Categories validation failed with $JSON_ERRORS error(s). Check the validation logs for details." >> $GITHUB_STEP_SUMMARY
             fi
           fi
         else
@@ -556,17 +610,6 @@ runs:
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Error details section (only if there are errors)
-        if [ "$JSON_ERRORS" -gt 0 ] || [ "$OPENAPI_ERRORS" -gt 0 ] || [ "$MARKDOWN_ERRORS" -gt 0 ]; then
-          echo "## 🚨 Validation Errors Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f validation-errors.md ]; then
-            cat validation-errors.md >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
         
         # Generated artifacts section
         echo "## 📄 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
@@ -576,6 +619,35 @@ runs:
         echo "- **validation-errors.md** - Detailed error log" >> $GITHUB_STEP_SUMMARY
         echo "- **spectral-report.md** - Detailed OpenAPI validation report" >> $GITHUB_STEP_SUMMARY
         echo "- **spectral-report.json** - Machine-readable OpenAPI validation data" >> $GITHUB_STEP_SUMMARY
+        echo "- **categories-errors.json** - Structured categories validation errors" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Next steps section
+        if [ "$JSON_ERRORS" -gt 0 ] || [ "$OPENAPI_ERRORS" -gt 0 ] || [ "$MARKDOWN_ERRORS" -gt 0 ]; then
+          echo "## 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To resolve validation issues:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$MARKDOWN_ERRORS" -gt 0 ]; then
+            echo "- **Markdown**: Review linting errors above and fix formatting issues" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$OPENAPI_ERRORS" -gt 0 ]; then
+            echo "- **OpenAPI**: Address the validation errors and warnings listed above" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$JSON_ERRORS" -gt 0 ]; then
+            echo "- **Categories**: Update invalid tagKey values to match allowed values shown above" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "- **Artifacts**: Download validation reports for detailed analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- **Local Testing**: Run validation locally using the development scripts" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ✅ All Validations Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🎉 All documentation, API specifications, and data structures are valid!" >> $GITHUB_STEP_SUMMARY
+        fi
         
     - name: Final validation check
       shell: bash
