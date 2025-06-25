@@ -486,8 +486,10 @@ runs:
         # Use pretty output for better readability and set build tofail on errors
         # Spectral exit code is 0 if no errors are found
         # Spectral exit code is 1 if errors are found
-        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path }}/api-spec-config/.spectral.yaml --format pretty --fail-severity error --output spectral-output.txt || true
-        spectral_exit_code=$?
+        {
+          spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path }}/api-spec-config/.spectral.yaml --format pretty --fail-severity error --output spectral-output.txt;
+          spectral_exit_code=$?;
+        } || true
         
         # Set errors_found value based on spectral exit code
         # 0 -> no errors -> errors_found = false
