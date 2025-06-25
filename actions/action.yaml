@@ -507,26 +507,14 @@ runs:
         echo "Spectral output:"
         cat spectral-output.txt
         echo ""
-      
-        # Write results directly to step summary
-        if [ "$spectral_exit_code" -eq 0 ]; then
-          echo "- **Result:** No issues found" >> $GITHUB_STEP_SUMMARY
-        else
-          if [ "$error_found" = true ]; then
-            echo "VALIDATION_FAILED=true" >> $GITHUB_ENV
-            echo "- **Result:** Validation failed - errors found" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Result:** Validation completed with warnings only" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          # Show detailed errors in step summary
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### OpenAPI Validation Output" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat spectral-output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        fi
+
+        #   Always show detailed errors/warnings in step summary
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### OpenAPI Validation Output" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat spectral-output.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
         
         echo "" >> $GITHUB_STEP_SUMMARY
         
