@@ -163,10 +163,10 @@ runs:
         # Skip validation if categories file is empty
         if [ -n "${{ inputs.categories-file }}" ]; then
           if [ ! -f "${{ inputs.categories-file }}" ]; then
-            echo "Categories file '${{ inputs.categories-file }}' not found - categories validation will be skipped"
+            echo "Categories file '${{ inputs.categories-file }}' not found - categories linting will be skipped"
           fi
         else
-          echo "Categories file input is empty - categories validation will be skipped"
+          echo "Categories file input is empty - categories linting will be skipped"
         fi
         
         echo "Input validation completed"
@@ -305,23 +305,23 @@ runs:
         echo "Schema file: categories-schema.json"
         echo ""
         
-        # Skip categories validation if categories file input is empty
+        # Skip categories linting if categories file input is empty
         if [ -z "${{ inputs.categories-file }}" ]; then
-          echo "Categories file input is empty - categories validation will be skipped"
+          echo "Categories file input is empty - categories linting will be skipped"
           echo ""
           
           # Set default values for downstream steps
           echo "JSON_ERRORS=0" >> $GITHUB_ENV
           
           # Write skip message to step summary
-          echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Categories Linting" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Skipped (no file specified)" >> $GITHUB_STEP_SUMMARY
           echo "- **Result:** Validation skipped" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "=============================================="
-          echo "CATEGORIES VALIDATION SKIPPED"
+          echo "CATEGORIES LINTING SKIPPED"
           echo "=============================================="
           exit 0
         fi
@@ -333,7 +333,7 @@ runs:
           echo "Validating ${{ inputs.categories-file }} against schema..."
             
           # Write categories section header to step summary
-          echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Categories Linting" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **File:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Schema:** \`categories-schema.json\`" >> $GITHUB_STEP_SUMMARY
@@ -349,7 +349,7 @@ runs:
             source .venv/bin/activate
               
             # Run validation with JSON output
-            echo "Running categories validation..."
+            echo "Running categories linting..."
             if python3 validate_categories.py "${{ github.workspace }}/${{ inputs.categories-file }}" "${{ github.action_path }}/categories-config/categories-schema.json" --json > validation-result.json 2>&1; then
               echo "Categories file passed schema validation!"
               json_errors=0
@@ -369,12 +369,12 @@ runs:
                 # Count errors from JSON output
                 json_errors=$(jq '.errors | length' categories-errors.json 2>/dev/null || echo "1")
                 
-                echo "Found $json_errors validation error(s)"
+                echo "Found $json_errors linting error(s)"
                 
                 # Write errors directly to step summary
-                echo "- **Result:** Found $json_errors validation error(s)" >> $GITHUB_STEP_SUMMARY
+                echo "- **Result:** Found $json_errors linting error(s)" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
-                echo "### Categories Validation Errors" >> $GITHUB_STEP_SUMMARY
+                echo "### Categories Linting Errors" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
                 
                 # Check if we have structured errors and display them
@@ -419,7 +419,7 @@ runs:
           json_errors=0
             
           # Write to step summary
-          echo "## Categories Validation" >> $GITHUB_STEP_SUMMARY
+          echo "## Categories Linting" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **File:** \`${{ inputs.categories-file }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Result:** File not found - skipping validation" >> $GITHUB_STEP_SUMMARY
@@ -433,12 +433,12 @@ runs:
         if [ $json_errors -eq 0 ]; then
           echo "Categories file passed schema validation!"
         else
-          echo "Found $json_errors JSON schema validation error(s)"
+          echo "Found $json_errors JSON schema linting error(s)"
         fi
         
         echo ""
         echo "=============================================="
-        echo "CATEGORIES VALIDATION COMPLETED"
+        echo "CATEGORIES LINTING COMPLETED"
         echo "=============================================="
 
     - name: Lint OpenAPI specification with Spectral
@@ -454,18 +454,18 @@ runs:
         echo "Linting OpenAPI specification: ${{ inputs.openapi-file }}"
         
         # Write OpenAPI section header to step summary
-        echo "## OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
+        echo "## OpenAPI Linting" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **File:** \`${{ inputs.openapi-file }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Tool:** Spectral CLI" >> $GITHUB_STEP_SUMMARY
         echo "- **Ruleset:** \`.spectral.yaml\`" >> $GITHUB_STEP_SUMMARY
         
-        # Skip OpenAPI validation if OpenAPI file is empty
+        # Skip OpenAPI linting if OpenAPI file is empty
         if [ -z "${{ inputs.openapi-file }}" ]; then
           echo "=============================================="
-          echo "SKIPPING OPENAPI VALIDATION"
+          echo "SKIPPING OPENAPI LINTING"
           echo "=============================================="
-          echo "OpenAPI file input is empty - skipping OpenAPI validation"
+          echo "OpenAPI file input is empty - skipping OpenAPI linting"
           echo ""
           
           # Set default values for downstream steps
@@ -477,7 +477,7 @@ runs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "=============================================="
-          echo "OPENAPI VALIDATION SKIPPED"
+          echo "OPENAPI LINTING SKIPPED"
           echo "=============================================="
           exit 0
         fi
