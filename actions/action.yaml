@@ -482,21 +482,28 @@ runs:
           exit 0
         fi
         
-        # Run Spectral with error handling to prevent build failure
-        spectral_exit_code=0
-        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path }}/api-spec-config/.spectral.yaml > spectral-output.txt 2>&1 || spectral_exit_code=$?
+
+        # Use pretty output for better readability and set build tofail on errors
+        # Spectral exit code is 0 if no errors are found
+        # Spectral exit code is 1 if errors are found
+        spectral lint "${{ inputs.openapi-file }}" --ruleset ${{ github.action_path }}/api-spec-config/.spectral.yaml --format pretty --fail-severity error || true
+        spectral_exit_code=$?
         
+        # Set errors_found value based on spectral exit code
+        # 0 -> no errors -> errors_found = false
+        # 1 -> errors -> errors_found = true
+        if [ "$spectral_exit_code" -eq 0 ]; then 
+          error_found=false
+        else
+          error_found=true
+        fi 
+        
+        # Print spectral output to console
         echo "Spectral completed with exit code: $spectral_exit_code"
         echo "Spectral output:"
         cat spectral-output.txt
         echo ""
-        
-        # Check if there are actual errors (not just warnings) in the output
-        error_found=false
-        if grep -q "error" spectral-output.txt; then
-          error_found=true
-        fi
-        
+      
         # Write results directly to step summary
         if [ "$spectral_exit_code" -eq 0 ]; then
           echo "- **Result:** No issues found" >> $GITHUB_STEP_SUMMARY
