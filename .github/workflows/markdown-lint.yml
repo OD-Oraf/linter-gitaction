@@ -17,7 +17,7 @@ on:
 
 jobs:
   valid-lint-docs-and-api:
-    name: Validate Documentation and OpenAPI
+    name: Valid Lint Documentation and OpenAPI
     runs-on: ubuntu-latest
     
     steps:
@@ -65,7 +65,7 @@ jobs:
             validation-errors.md
           retention-days: 30
   invalid-lint-docs-and-api:
-    name: Validate Documentation and OpenAPI
+    name: Invalid Lint Documentation and OpenAPI
     runs-on: ubuntu-latest
 
     steps:
