@@ -1,0 +1,13 @@
+[
+  {
+    "tagKey" : "Owning Business Group",
+    "value":[
+      "Global",
+      "Service"
+   ]
+  },
+  {
+    "tagKey" : "Data Classification",
+    "value" : "DCL4"
+  }
+]

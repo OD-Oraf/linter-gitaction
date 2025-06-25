@@ -1,3 +1,2 @@
 # Example
-
 Simple example
